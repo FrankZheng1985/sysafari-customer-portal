@@ -7,7 +7,7 @@ module.exports = {
   apps: [{
     name: 'portal-api',
     script: 'server/app.js',
-    cwd: '/var/www/sysafari-portal',
+    cwd: '/var/www/sysafari-customer-portal',
     instances: 1,
     autorestart: true,
     watch: false,
@@ -16,9 +16,9 @@ module.exports = {
       NODE_ENV: 'production',
       PORT: 3003
     },
-    error_file: '/var/www/sysafari-portal/logs/error.log',
-    out_file: '/var/www/sysafari-portal/logs/out.log',
-    log_file: '/var/www/sysafari-portal/logs/combined.log',
+    error_file: '/var/www/sysafari-customer-portal/logs/error.log',
+    out_file: '/var/www/sysafari-customer-portal/logs/out.log',
+    log_file: '/var/www/sysafari-customer-portal/logs/combined.log',
     time: true,
     // 重启策略
     exp_backoff_restart_delay: 100,
