@@ -1,0 +1,35 @@
+{
+  "name": "sysafari-customer-portal-server",
+  "version": "1.0.0",
+  "description": "Sysafari 客户门户系统后端 API",
+  "type": "module",
+  "main": "app.js",
+  "scripts": {
+    "start": "node app.js",
+    "dev": "nodemon app.js",
+    "init-db": "node scripts/init-db.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.1",
+    "pg": "^8.11.3",
+    "bcryptjs": "^2.4.3",
+    "jsonwebtoken": "^9.0.2",
+    "axios": "^1.6.7",
+    "helmet": "^7.1.0",
+    "express-rate-limit": "^7.1.5",
+    "morgan": "^1.10.0"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.3"
+  },
+  "keywords": [
+    "logistics",
+    "customer-portal",
+    "api"
+  ],
+  "author": "Sysafari Logistics",
+  "license": "MIT"
+}
+
