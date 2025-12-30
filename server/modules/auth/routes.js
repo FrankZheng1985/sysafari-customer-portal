@@ -16,24 +16,26 @@ const router = Router()
  */
 router.post('/login', async (req, res) => {
   try {
-    const { email, password } = req.body
+    // 支持 email 或 username 字段
+    const { email, username, password } = req.body
+    const loginId = email || username
     
-    if (!email || !password) {
+    if (!loginId || !password) {
       return res.status(400).json({
         errCode: 400,
-        msg: '请输入邮箱和密码',
+        msg: '请输入用户名/邮箱和密码',
         data: null
       })
     }
     
     const db = getDatabase()
     
-    // 查询客户
+    // 查询客户（支持 email 或 username）
     const customer = await db.prepare(`
       SELECT id, customer_id, email, password_hash, company_name, contact_name, phone, status
       FROM portal_customers
-      WHERE email = $1
-    `).get(email.toLowerCase().trim())
+      WHERE email = $1 OR customer_id = $1
+    `).get(loginId.toLowerCase().trim())
     
     if (!customer) {
       return res.status(401).json({

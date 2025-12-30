@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react'
-import api, { mainApi } from '../utils/api'
+import api from '../utils/api'
 
 interface User {
   id: number
@@ -33,9 +33,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const initAuth = async () => {
       if (token) {
         try {
-          mainApi.defaults.headers.common['Authorization'] = `Bearer ${token}`
           api.defaults.headers.common['Authorization'] = `Bearer ${token}`
-          const response = await mainApi.get('/auth/me')
+          const response = await api.get('/auth/me')
           if (response.data.errCode === 200) {
             setUser(response.data.data)
           } else {
@@ -54,24 +53,33 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const handleLogout = () => {
     localStorage.removeItem('portal_token')
-    delete mainApi.defaults.headers.common['Authorization']
     delete api.defaults.headers.common['Authorization']
     setToken(null)
     setUser(null)
   }
 
   const login = async (username: string, password: string) => {
-    // 使用主系统的 Portal API 登录
-    const response = await mainApi.post('/auth/login', { username, password })
+    // 使用门户后端 API 登录
+    const response = await api.post('/auth/login', { username, password })
     
     if (response.data.errCode !== 200) {
       throw new Error(response.data.msg || '登录失败')
     }
     
-    const { token: newToken, user: userData } = response.data.data
+    const { token: newToken, customer } = response.data.data
+    
+    // 转换字段名
+    const userData = {
+      id: customer.id,
+      customerId: customer.customerId,
+      customerName: customer.companyName,
+      customerCode: customer.customerId,
+      username: customer.email,
+      email: customer.email,
+      phone: customer.phone
+    }
     
     localStorage.setItem('portal_token', newToken)
-    mainApi.defaults.headers.common['Authorization'] = `Bearer ${newToken}`
     api.defaults.headers.common['Authorization'] = `Bearer ${newToken}`
     setToken(newToken)
     setUser(userData)
