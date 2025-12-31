@@ -29,8 +29,13 @@ let pgPool = null
 
 /**
  * 将 ? 占位符转换为 PostgreSQL 风格的 $1, $2...
+ * 如果 SQL 中已经包含 $1 等占位符，则不进行转换
  */
 function convertPlaceholders(sql) {
+  // 如果已经包含 $N 格式的占位符，不转换
+  if (/\$\d/.test(sql)) {
+    return sql
+  }
   let index = 0
   return sql.replace(/\?/g, () => `$${++index}`)
 }

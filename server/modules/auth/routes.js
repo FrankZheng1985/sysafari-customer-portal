@@ -34,8 +34,8 @@ router.post('/login', async (req, res) => {
     const customer = await db.prepare(`
       SELECT id, customer_id, email, password_hash, company_name, contact_name, phone, status
       FROM portal_customers
-      WHERE email = $1 OR customer_id = $1
-    `).get(loginId.toLowerCase().trim())
+      WHERE email = ? OR customer_id = ?
+    `).get(loginId.toLowerCase().trim(), loginId.toLowerCase().trim())
     
     if (!customer) {
       return res.status(401).json({
@@ -75,7 +75,7 @@ router.post('/login', async (req, res) => {
     await db.prepare(`
       UPDATE portal_customers 
       SET last_login_at = NOW(), login_count = login_count + 1
-      WHERE id = $1
+      WHERE id = ?
     `).run(customer.id)
     
     // 记录活动日志
@@ -124,7 +124,7 @@ router.get('/me', authenticate, async (req, res) => {
       SELECT id, customer_id, email, company_name, contact_name, phone, status, 
              last_login_at, login_count, created_at
       FROM portal_customers
-      WHERE id = $1
+      WHERE id = ?
     `).get(req.customer.id)
     
     if (!customer) {
@@ -190,7 +190,7 @@ router.post('/change-password', authenticate, async (req, res) => {
     
     // 获取当前密码
     const customer = await db.prepare(`
-      SELECT password_hash FROM portal_customers WHERE id = $1
+      SELECT password_hash FROM portal_customers WHERE id = ?
     `).get(req.customer.id)
     
     if (!customer) {
@@ -216,7 +216,7 @@ router.post('/change-password', authenticate, async (req, res) => {
     
     // 更新密码
     await db.prepare(`
-      UPDATE portal_customers SET password_hash = $1, updated_at = NOW() WHERE id = $2
+      UPDATE portal_customers SET password_hash = ?, updated_at = NOW() WHERE id = ?
     `).run(newPasswordHash, req.customer.id)
     
     // 记录活动日志
