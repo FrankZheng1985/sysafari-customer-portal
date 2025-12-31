@@ -36,7 +36,7 @@ router.post('/login', async (req, res) => {
       SELECT 
         ca.id, ca.customer_id, ca.username, ca.email, ca.password_hash, 
         ca.phone, ca.status, ca.login_attempts, ca.locked_until,
-        c.company_name, c.contact_name
+        c.company_name, c.contact_person
       FROM customer_accounts ca
       LEFT JOIN customers c ON ca.customer_id = c.id
       WHERE ca.username = ? OR ca.email = ?
@@ -124,7 +124,7 @@ router.post('/login', async (req, res) => {
           username: account.username,
           email: account.email,
           companyName: account.company_name,
-          contactName: account.contact_name,
+          contactPerson: account.contact_person,
           phone: account.phone
         }
       }
@@ -152,7 +152,7 @@ router.get('/me', authenticate, async (req, res) => {
       SELECT 
         ca.id, ca.customer_id, ca.username, ca.email, ca.phone, ca.status,
         ca.last_login_at, ca.created_at,
-        c.company_name, c.contact_name, c.customer_code
+        c.company_name, c.contact_person, c.customer_code
       FROM customer_accounts ca
       LEFT JOIN customers c ON ca.customer_id = c.id
       WHERE ca.id = ?
@@ -176,7 +176,7 @@ router.get('/me', authenticate, async (req, res) => {
         username: account.username,
         email: account.email,
         companyName: account.company_name,
-        contactName: account.contact_name,
+        contactPerson: account.contact_person,
         phone: account.phone,
         status: account.status,
         lastLoginAt: account.last_login_at,

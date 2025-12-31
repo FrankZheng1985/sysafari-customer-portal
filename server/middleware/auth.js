@@ -81,7 +81,7 @@ export function authenticate(req, res, next) {
         username: account.username,
         email: account.email,
         companyName: account.company_name,
-        contactName: account.contact_name,
+        contactPerson: account.contact_person,
         status: account.status
       }
       
@@ -108,7 +108,7 @@ async function verifyCustomer(accountId) {
   const account = await db.prepare(`
     SELECT 
       ca.id, ca.customer_id, ca.username, ca.email, ca.status,
-      c.company_name, c.contact_name
+      c.company_name, c.contact_person
     FROM customer_accounts ca
     LEFT JOIN customers c ON ca.customer_id = c.id
     WHERE ca.id = ? AND ca.status = 'active'
@@ -141,7 +141,7 @@ export function optionalAuth(req, res, next) {
             username: account.username,
             email: account.email,
             companyName: account.company_name,
-            contactName: account.contact_name,
+            contactPerson: account.contact_person,
             status: account.status
           }
         }
