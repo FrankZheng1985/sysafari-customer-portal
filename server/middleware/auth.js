@@ -1,6 +1,7 @@
 /**
  * 客户门户认证中间件
  * 使用 JWT Token 进行客户身份验证
+ * 直接使用 ERP 系统的 customer_accounts 表
  */
 
 import jwt from 'jsonwebtoken'
@@ -63,9 +64,9 @@ export function authenticate(req, res, next) {
   }
 
   // 从数据库验证客户是否存在且状态正常
-  verifyCustomer(decoded.customerId)
-    .then(customer => {
-      if (!customer) {
+  verifyCustomer(decoded.accountId)
+    .then(account => {
+      if (!account) {
         return res.status(401).json({
           errCode: 401,
           msg: '账户不存在或已禁用',
@@ -75,12 +76,13 @@ export function authenticate(req, res, next) {
       
       // 将客户信息附加到请求对象
       req.customer = {
-        id: customer.id,
-        customerId: customer.customer_id,
-        email: customer.email,
-        companyName: customer.company_name,
-        contactName: customer.contact_name,
-        status: customer.status
+        accountId: account.id,
+        customerId: account.customer_id,
+        username: account.username,
+        email: account.email,
+        companyName: account.company_name,
+        contactName: account.contact_name,
+        status: account.status
       }
       
       next()
@@ -96,19 +98,23 @@ export function authenticate(req, res, next) {
 }
 
 /**
- * 验证客户是否存在且状态正常
- * @param {number} customerId - 客户 ID
+ * 验证客户账户是否存在且状态正常
+ * 使用 ERP 的 customer_accounts 表
+ * @param {number} accountId - 客户账户 ID
  * @returns {Promise<Object|null>} 客户信息或 null
  */
-async function verifyCustomer(customerId) {
+async function verifyCustomer(accountId) {
   const db = getDatabase()
-  const customer = await db.prepare(`
-    SELECT id, customer_id, email, company_name, contact_name, status
-    FROM portal_customers
-    WHERE id = $1 AND status = 'active'
-  `).get(customerId)
+  const account = await db.prepare(`
+    SELECT 
+      ca.id, ca.customer_id, ca.username, ca.email, ca.status,
+      c.company_name, c.contact_name
+    FROM customer_accounts ca
+    LEFT JOIN customers c ON ca.customer_id = c.id
+    WHERE ca.id = ? AND ca.status = 'active'
+  `).get(accountId)
   
-  return customer
+  return account
 }
 
 /**
@@ -126,16 +132,17 @@ export function optionalAuth(req, res, next) {
   const decoded = verifyToken(token)
   
   if (decoded) {
-    verifyCustomer(decoded.customerId)
-      .then(customer => {
-        if (customer) {
+    verifyCustomer(decoded.accountId)
+      .then(account => {
+        if (account) {
           req.customer = {
-            id: customer.id,
-            customerId: customer.customer_id,
-            email: customer.email,
-            companyName: customer.company_name,
-            contactName: customer.contact_name,
-            status: customer.status
+            accountId: account.id,
+            customerId: account.customer_id,
+            username: account.username,
+            email: account.email,
+            companyName: account.company_name,
+            contactName: account.contact_name,
+            status: account.status
           }
         }
         next()
@@ -165,10 +172,12 @@ export async function logActivity(params) {
 
   try {
     const db = getDatabase()
+    
+    // 尝试插入到 portal_activity_logs，如果表不存在则忽略
     await db.prepare(`
       INSERT INTO portal_activity_logs 
       (customer_id, action, resource_type, resource_id, ip_address, user_agent, details)
-      VALUES ($1, $2, $3, $4, $5, $6, $7)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
     `).run(
       customerId,
       action,
@@ -179,7 +188,10 @@ export async function logActivity(params) {
       details ? JSON.stringify(details) : null
     )
   } catch (error) {
-    console.error('记录活动日志失败:', error)
+    // 如果表不存在，静默忽略
+    if (!error.message?.includes('does not exist')) {
+      console.error('记录活动日志失败:', error)
+    }
   }
 }
 
@@ -190,4 +202,3 @@ export default {
   optionalAuth,
   logActivity
 }
-

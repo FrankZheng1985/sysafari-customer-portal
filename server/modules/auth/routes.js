@@ -1,6 +1,6 @@
 /**
  * 客户认证模块路由
- * 处理客户登录、注册、修改密码等
+ * 直接使用 ERP 系统的 customer_accounts 表进行认证
  */
 
 import { Router } from 'express'
@@ -13,6 +13,7 @@ const router = Router()
 /**
  * 客户登录
  * POST /api/auth/login
+ * 使用 ERP 系统的 customer_accounts 表
  */
 router.post('/login', async (req, res) => {
   try {
@@ -30,23 +31,36 @@ router.post('/login', async (req, res) => {
     
     const db = getDatabase()
     
-    // 查询客户（支持 email 或 username）
-    const customer = await db.prepare(`
-      SELECT id, customer_id, email, password_hash, company_name, contact_name, phone, status
-      FROM portal_customers
-      WHERE email = ? OR customer_id = ?
-    `).get(loginId.toLowerCase().trim(), loginId.toLowerCase().trim())
+    // 从 ERP 的 customer_accounts 表查询客户账户
+    const account = await db.prepare(`
+      SELECT 
+        ca.id, ca.customer_id, ca.username, ca.email, ca.password_hash, 
+        ca.phone, ca.status, ca.login_attempts, ca.locked_until,
+        c.company_name, c.contact_name
+      FROM customer_accounts ca
+      LEFT JOIN customers c ON ca.customer_id = c.id
+      WHERE ca.username = ? OR ca.email = ?
+    `).get(loginId.trim(), loginId.toLowerCase().trim())
     
-    if (!customer) {
+    if (!account) {
       return res.status(401).json({
         errCode: 401,
-        msg: '邮箱或密码错误',
+        msg: '用户名或密码错误',
+        data: null
+      })
+    }
+    
+    // 检查账户是否被锁定
+    if (account.locked_until && new Date(account.locked_until) > new Date()) {
+      return res.status(401).json({
+        errCode: 401,
+        msg: '账户已被锁定，请稍后再试',
         data: null
       })
     }
     
     // 检查账户状态
-    if (customer.status !== 'active') {
+    if (account.status !== 'active') {
       return res.status(401).json({
         errCode: 401,
         msg: '账户已被禁用，请联系客服',
@@ -55,32 +69,45 @@ router.post('/login', async (req, res) => {
     }
     
     // 验证密码
-    const isValidPassword = await bcrypt.compare(password, customer.password_hash)
+    const isValidPassword = await bcrypt.compare(password, account.password_hash)
     if (!isValidPassword) {
+      // 增加登录失败次数
+      await db.prepare(`
+        UPDATE customer_accounts 
+        SET login_attempts = login_attempts + 1,
+            locked_until = CASE WHEN login_attempts >= 4 THEN NOW() + INTERVAL '30 minutes' ELSE locked_until END
+        WHERE id = ?
+      `).run(account.id)
+      
       return res.status(401).json({
         errCode: 401,
-        msg: '邮箱或密码错误',
+        msg: '用户名或密码错误',
         data: null
       })
     }
     
     // 生成 Token
     const token = generateToken({
-      customerId: customer.id,
-      email: customer.email,
-      companyName: customer.company_name
+      accountId: account.id,
+      customerId: account.customer_id,
+      username: account.username,
+      email: account.email,
+      companyName: account.company_name
     })
     
-    // 更新登录信息
+    // 更新登录信息，重置失败次数
     await db.prepare(`
-      UPDATE portal_customers 
-      SET last_login_at = NOW(), login_count = login_count + 1
+      UPDATE customer_accounts 
+      SET last_login_at = NOW(), 
+          last_login_ip = ?,
+          login_attempts = 0,
+          locked_until = NULL
       WHERE id = ?
-    `).run(customer.id)
+    `).run(req.ip, account.id)
     
     // 记录活动日志
     await logActivity({
-      customerId: customer.id,
+      customerId: account.id,
       action: 'login',
       ipAddress: req.ip,
       userAgent: req.get('User-Agent')
@@ -92,12 +119,13 @@ router.post('/login', async (req, res) => {
       data: {
         token,
         customer: {
-          id: customer.id,
-          customerId: customer.customer_id,
-          email: customer.email,
-          companyName: customer.company_name,
-          contactName: customer.contact_name,
-          phone: customer.phone
+          id: account.id,
+          customerId: account.customer_id,
+          username: account.username,
+          email: account.email,
+          companyName: account.company_name,
+          contactName: account.contact_name,
+          phone: account.phone
         }
       }
     })
@@ -120,14 +148,17 @@ router.get('/me', authenticate, async (req, res) => {
   try {
     const db = getDatabase()
     
-    const customer = await db.prepare(`
-      SELECT id, customer_id, email, company_name, contact_name, phone, status, 
-             last_login_at, login_count, created_at
-      FROM portal_customers
-      WHERE id = ?
-    `).get(req.customer.id)
+    const account = await db.prepare(`
+      SELECT 
+        ca.id, ca.customer_id, ca.username, ca.email, ca.phone, ca.status,
+        ca.last_login_at, ca.created_at,
+        c.company_name, c.contact_name, c.customer_code
+      FROM customer_accounts ca
+      LEFT JOIN customers c ON ca.customer_id = c.id
+      WHERE ca.id = ?
+    `).get(req.customer.accountId)
     
-    if (!customer) {
+    if (!account) {
       return res.status(404).json({
         errCode: 404,
         msg: '客户不存在',
@@ -139,16 +170,17 @@ router.get('/me', authenticate, async (req, res) => {
       errCode: 200,
       msg: 'success',
       data: {
-        id: customer.id,
-        customerId: customer.customer_id,
-        email: customer.email,
-        companyName: customer.company_name,
-        contactName: customer.contact_name,
-        phone: customer.phone,
-        status: customer.status,
-        lastLoginAt: customer.last_login_at,
-        loginCount: customer.login_count,
-        createdAt: customer.created_at
+        id: account.id,
+        customerId: account.customer_id,
+        customerCode: account.customer_code,
+        username: account.username,
+        email: account.email,
+        companyName: account.company_name,
+        contactName: account.contact_name,
+        phone: account.phone,
+        status: account.status,
+        lastLoginAt: account.last_login_at,
+        createdAt: account.created_at
       }
     })
     
@@ -189,11 +221,11 @@ router.post('/change-password', authenticate, async (req, res) => {
     const db = getDatabase()
     
     // 获取当前密码
-    const customer = await db.prepare(`
-      SELECT password_hash FROM portal_customers WHERE id = ?
-    `).get(req.customer.id)
+    const account = await db.prepare(`
+      SELECT password_hash FROM customer_accounts WHERE id = ?
+    `).get(req.customer.accountId)
     
-    if (!customer) {
+    if (!account) {
       return res.status(404).json({
         errCode: 404,
         msg: '客户不存在',
@@ -202,7 +234,7 @@ router.post('/change-password', authenticate, async (req, res) => {
     }
     
     // 验证旧密码
-    const isValidPassword = await bcrypt.compare(oldPassword, customer.password_hash)
+    const isValidPassword = await bcrypt.compare(oldPassword, account.password_hash)
     if (!isValidPassword) {
       return res.status(400).json({
         errCode: 400,
@@ -216,12 +248,14 @@ router.post('/change-password', authenticate, async (req, res) => {
     
     // 更新密码
     await db.prepare(`
-      UPDATE portal_customers SET password_hash = ?, updated_at = NOW() WHERE id = ?
-    `).run(newPasswordHash, req.customer.id)
+      UPDATE customer_accounts 
+      SET password_hash = ?, password_changed_at = NOW(), updated_at = NOW() 
+      WHERE id = ?
+    `).run(newPasswordHash, req.customer.accountId)
     
     // 记录活动日志
     await logActivity({
-      customerId: req.customer.id,
+      customerId: req.customer.accountId,
       action: 'change_password',
       ipAddress: req.ip,
       userAgent: req.get('User-Agent')
@@ -251,7 +285,7 @@ router.post('/logout', authenticate, async (req, res) => {
   try {
     // 记录活动日志
     await logActivity({
-      customerId: req.customer.id,
+      customerId: req.customer.accountId,
       action: 'logout',
       ipAddress: req.ip,
       userAgent: req.get('User-Agent')
@@ -274,4 +308,3 @@ router.post('/logout', authenticate, async (req, res) => {
 })
 
 export default router
-
