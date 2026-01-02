@@ -5,10 +5,33 @@
 
 import { Router } from 'express'
 import axios from 'axios'
+import multer from 'multer'
+import xlsx from 'xlsx'
 import { getDatabase, generateId } from '../../config/database.js'
 import { authenticate, logActivity } from '../../middleware/auth.js'
 
 const router = Router()
+
+// 配置文件上传
+const storage = multer.memoryStorage()
+const upload = multer({
+  storage,
+  limits: {
+    fileSize: 10 * 1024 * 1024 // 10MB 限制
+  },
+  fileFilter: (req, file, cb) => {
+    const allowedTypes = [
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', // .xlsx
+      'application/vnd.ms-excel', // .xls
+      'text/csv' // .csv
+    ]
+    if (allowedTypes.includes(file.mimetype) || file.originalname.match(/\.(xlsx|xls|csv)$/i)) {
+      cb(null, true)
+    } else {
+      cb(new Error('不支持的文件格式，请上传 Excel 或 CSV 文件'))
+    }
+  }
+})
 
 // 主系统 API 配置
 const MAIN_API_URL = process.env.MAIN_API_URL || 'http://localhost:3001'
@@ -452,6 +475,270 @@ router.post('/clearance/estimate', authenticate, async (req, res) => {
   } catch (error) {
     console.error('清关估算失败:', error.message)
     res.status(500).json({ errCode: 500, msg: '清关估算失败', data: null })
+  }
+})
+
+/**
+ * 上传Excel货物明细
+ * POST /api/clearance/upload-excel
+ */
+router.post('/clearance/upload-excel', authenticate, upload.single('file'), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ errCode: 400, msg: '请上传文件', data: null })
+    }
+
+    const db = getDatabase()
+    const customerId = req.customer.customerId
+    const customerName = req.customer.companyName || req.customer.email
+
+    // 解析 Excel 文件
+    const workbook = xlsx.read(req.file.buffer, { type: 'buffer' })
+    const sheetName = workbook.SheetNames[0]
+    const worksheet = workbook.Sheets[sheetName]
+    const jsonData = xlsx.utils.sheet_to_json(worksheet, { defval: '' })
+
+    if (!jsonData || jsonData.length === 0) {
+      return res.status(400).json({ errCode: 400, msg: 'Excel文件为空或格式不正确', data: null })
+    }
+
+    // 解析货物项（支持中英文列名）
+    const items = jsonData.map((row, index) => {
+      // 支持多种列名格式
+      const name = row['品名'] || row['Name'] || row['商品名称'] || row['Product'] || row['Description'] || ''
+      const hsCode = row['HS CODE'] || row['HSCode'] || row['HS编码'] || row['海关编码'] || ''
+      const value = parseFloat(row['货值'] || row['Value'] || row['金额'] || row['Amount'] || 0) || 0
+      const quantity = parseInt(row['数量'] || row['Quantity'] || row['Qty'] || 1) || 1
+      const weight = parseFloat(row['重量'] || row['Weight'] || row['净重'] || 0) || 0
+      const dutyRate = parseFloat(row['关税率'] || row['Duty Rate'] || row['关税'] || 0) || 0
+      const vatRate = parseFloat(row['增值税率'] || row['VAT Rate'] || row['VAT'] || 19) || 19
+
+      return {
+        index: index + 1,
+        name: String(name).trim(),
+        hsCode: String(hsCode).trim().replace(/[^0-9]/g, ''), // 只保留数字
+        value,
+        quantity,
+        weight,
+        dutyRate,
+        vatRate
+      }
+    }).filter(item => item.name || item.hsCode) // 过滤空行
+
+    if (items.length === 0) {
+      return res.status(400).json({ errCode: 400, msg: '未能解析到有效的货物数据', data: null })
+    }
+
+    // 保存上传记录到数据库
+    const fileId = generateId('FILE')
+    await db.prepare(`
+      INSERT INTO customer_uploaded_files (
+        id, customer_id, customer_name, file_name, file_size,
+        file_type, item_count, parsed_data, status
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+    `).run(
+      fileId,
+      customerId,
+      customerName,
+      req.file.originalname,
+      req.file.size,
+      'cargo_excel',
+      items.length,
+      JSON.stringify(items),
+      'active'
+    )
+
+    // 记录活动
+    await logActivity({
+      customerId: req.customer.id,
+      action: 'upload_cargo_excel',
+      resourceType: 'file',
+      resourceId: fileId,
+      details: { fileName: req.file.originalname, itemCount: items.length }
+    })
+
+    res.json({
+      errCode: 200,
+      msg: '上传成功',
+      data: {
+        fileId,
+        fileName: req.file.originalname,
+        fileSize: req.file.size,
+        items
+      }
+    })
+  } catch (error) {
+    console.error('上传Excel失败:', error.message)
+    res.status(500).json({ errCode: 500, msg: '上传失败：' + error.message, data: null })
+  }
+})
+
+/**
+ * 获取待确认的匹配结果
+ * GET /api/inquiries/pending-confirmations
+ */
+router.get('/inquiries/pending-confirmations', authenticate, async (req, res) => {
+  try {
+    const db = getDatabase()
+    const customerId = req.customer.customerId
+
+    // 查询状态为 "matched"（已匹配待确认）的询价
+    const inquiriesRaw = await db.prepare(`
+      SELECT 
+        id, inquiry_number, customer_id, customer_name,
+        inquiry_type, status, matching_status, clearance_data, transport_data,
+        estimated_duty, estimated_vat, clearance_fee,
+        transport_fee, total_quote, valid_until, notes,
+        matched_items, matched_at,
+        created_at, updated_at
+      FROM customer_inquiries
+      WHERE customer_id = $1 AND matching_status = 'matched'
+      ORDER BY matched_at DESC
+    `).all(customerId)
+
+    const inquiries = (inquiriesRaw || []).map(inq => ({
+      id: inq.id,
+      inquiryNumber: inq.inquiry_number,
+      customerId: inq.customer_id,
+      customerName: inq.customer_name,
+      inquiryType: inq.inquiry_type,
+      status: inq.status,
+      matchingStatus: inq.matching_status,
+      clearanceData: inq.clearance_data ? JSON.parse(inq.clearance_data) : null,
+      transportData: inq.transport_data ? JSON.parse(inq.transport_data) : null,
+      estimatedDuty: parseFloat(inq.estimated_duty || 0),
+      estimatedVat: parseFloat(inq.estimated_vat || 0),
+      clearanceFee: parseFloat(inq.clearance_fee || 0),
+      transportFee: parseFloat(inq.transport_fee || 0),
+      totalQuote: parseFloat(inq.total_quote || 0),
+      validUntil: inq.valid_until,
+      notes: inq.notes,
+      matchedItems: inq.matched_items ? JSON.parse(inq.matched_items) : null,
+      matchedAt: inq.matched_at,
+      createdAt: inq.created_at,
+      updatedAt: inq.updated_at
+    }))
+
+    res.json({
+      errCode: 200,
+      msg: 'success',
+      data: inquiries
+    })
+  } catch (error) {
+    console.error('获取待确认记录失败:', error.message)
+    res.json({ errCode: 200, msg: 'success', data: [] })
+  }
+})
+
+/**
+ * 确认匹配结果
+ * POST /api/inquiries/:id/confirm-matching
+ */
+router.post('/inquiries/:id/confirm-matching', authenticate, async (req, res) => {
+  try {
+    const db = getDatabase()
+    const customerId = req.customer.customerId
+    const { id } = req.params
+
+    // 验证询价归属
+    const inquiry = await db.prepare(`
+      SELECT * FROM customer_inquiries 
+      WHERE id = $1 AND customer_id = $2 AND matching_status = 'matched'
+    `).get(id, customerId)
+
+    if (!inquiry) {
+      return res.status(404).json({ errCode: 404, msg: '询价不存在或状态不正确', data: null })
+    }
+
+    // 更新状态为已确认
+    await db.prepare(`
+      UPDATE customer_inquiries 
+      SET matching_status = 'confirmed', 
+          status = 'processing',
+          confirmed_at = CURRENT_TIMESTAMP,
+          updated_at = CURRENT_TIMESTAMP
+      WHERE id = $1
+    `).run(id)
+
+    // 记录活动
+    await logActivity({
+      customerId: req.customer.id,
+      action: 'confirm_matching',
+      resourceType: 'inquiry',
+      resourceId: id,
+      details: { inquiryNumber: inquiry.inquiry_number }
+    })
+
+    // TODO: 通知单证部门继续处理清关
+    // 可以调用主系统 API 或发送消息队列
+
+    res.json({
+      errCode: 200,
+      msg: '已确认匹配结果',
+      data: { id, status: 'confirmed' }
+    })
+  } catch (error) {
+    console.error('确认匹配结果失败:', error.message)
+    res.status(500).json({ errCode: 500, msg: '操作失败', data: null })
+  }
+})
+
+/**
+ * 拒绝/取消匹配结果
+ * POST /api/inquiries/:id/reject-matching
+ */
+router.post('/inquiries/:id/reject-matching', authenticate, async (req, res) => {
+  try {
+    const db = getDatabase()
+    const customerId = req.customer.customerId
+    const { id } = req.params
+    const { reason } = req.body
+
+    if (!reason || !reason.trim()) {
+      return res.status(400).json({ errCode: 400, msg: '请填写取消原因', data: null })
+    }
+
+    // 验证询价归属
+    const inquiry = await db.prepare(`
+      SELECT * FROM customer_inquiries 
+      WHERE id = $1 AND customer_id = $2 AND matching_status = 'matched'
+    `).get(id, customerId)
+
+    if (!inquiry) {
+      return res.status(404).json({ errCode: 404, msg: '询价不存在或状态不正确', data: null })
+    }
+
+    // 更新状态为已拒绝
+    await db.prepare(`
+      UPDATE customer_inquiries 
+      SET matching_status = 'rejected', 
+          status = 'rejected',
+          reject_reason = $2,
+          rejected_at = CURRENT_TIMESTAMP,
+          updated_at = CURRENT_TIMESTAMP
+      WHERE id = $1
+    `).run(id, reason.trim())
+
+    // 记录活动
+    await logActivity({
+      customerId: req.customer.id,
+      action: 'reject_matching',
+      resourceType: 'inquiry',
+      resourceId: id,
+      details: { inquiryNumber: inquiry.inquiry_number, reason }
+    })
+
+    // TODO: 通知单证部门客户已拒绝
+    // 可以调用主系统 API 或发送消息队列
+
+    res.json({
+      errCode: 200,
+      msg: '已取消匹配结果',
+      data: { id, status: 'rejected' }
+    })
+  } catch (error) {
+    console.error('拒绝匹配结果失败:', error.message)
+    res.status(500).json({ errCode: 500, msg: '操作失败', data: null })
   }
 })
 

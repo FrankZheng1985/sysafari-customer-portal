@@ -235,10 +235,10 @@ export default function AddressAutocomplete({
   const handleFocus = () => {
     setIsOpen(true)
     if (!searchQuery) {
-      // 显示默认选项：历史地址 + 常用港口/城市
+      // 显示默认选项：历史地址 + 所有基础位置数据（港口/城市）
       const defaultOptions = [
-        ...historyAddresses.slice(0, 3),
-        ...baseLocations.slice(0, 5)
+        ...historyAddresses.slice(0, 5),
+        ...baseLocations // 显示所有已加载的基础数据
       ]
       setSuggestions(defaultOptions)
     }

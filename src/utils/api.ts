@@ -165,6 +165,16 @@ export const portalApi = {
   acceptQuote: (id: string) => api.post(`/inquiries/${id}/accept`),
   rejectQuote: (id: string, reason?: string) => api.post(`/inquiries/${id}/reject`, { reason }),
   
+  // Excel上传（货物明细导入）
+  uploadCargoExcel: (formData: FormData) => api.post('/clearance/upload-excel', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' }
+  }),
+  
+  // 待确认匹配结果相关
+  getPendingConfirmations: () => api.get('/inquiries/pending-confirmations'),
+  confirmMatching: (id: string) => api.post(`/inquiries/${id}/confirm-matching`),
+  rejectMatching: (id: string, reason: string) => api.post(`/inquiries/${id}/reject-matching`, { reason }),
+  
   // 运输计算 - 使用门户后端 API
   calculateTransport: (data: any) => api.post('/transport/calculate', data),
   

@@ -1,9 +1,10 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { portalApi } from '../utils/api'
 import { 
   FileText, Truck, Plus, Trash2, MapPin, Package, 
   Calculator, Clock, Check, X, Eye,
-  AlertCircle, Loader2
+  AlertCircle, Loader2, Upload, FileSpreadsheet,
+  RefreshCw, CheckCircle, XCircle
 } from 'lucide-react'
 import AddressAutocomplete from '../components/AddressAutocomplete'
 
@@ -73,6 +74,31 @@ interface Inquiry {
   totalQuote: number
   validUntil: string
   createdAt: string
+  // 新增：匹配结果相关
+  matchingStatus?: 'pending' | 'matched' | 'confirmed' | 'rejected'
+  matchedItems?: MatchedCargoItem[]
+  matchedAt?: string
+  confirmedAt?: string
+}
+
+// 匹配后的货物项
+interface MatchedCargoItem extends CargoItem {
+  originalName?: string  // 原始品名
+  matchedName?: string   // 匹配后品名
+  matchedHsCode?: string // 匹配后的HS CODE
+  matchConfidence?: number // 匹配置信度
+  calculatedDuty?: number  // 计算后的关税
+  calculatedVat?: number   // 计算后的增值税
+  remarks?: string        // 备注
+}
+
+// 上传的Excel文件信息
+interface UploadedFile {
+  id: string
+  fileName: string
+  fileSize: number
+  uploadedAt: string
+  itemCount: number
 }
 
 // Tab 类型
@@ -102,6 +128,18 @@ export default function Quote() {
   const [isExpress, setIsExpress] = useState(false)
   const [clearanceQuote, setClearanceQuote] = useState<any>(null)
   
+  // Excel上传相关
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  const [uploadedFile, setUploadedFile] = useState<UploadedFile | null>(null)
+  const [uploading, setUploading] = useState(false)
+  
+  // 待确认匹配结果
+  const [pendingConfirmations, setPendingConfirmations] = useState<Inquiry[]>([])
+  const [loadingConfirmations, setLoadingConfirmations] = useState(false)
+  const [selectedConfirmation, setSelectedConfirmation] = useState<Inquiry | null>(null)
+  const [confirmationAction, setConfirmationAction] = useState<'confirm' | 'reject' | null>(null)
+  const [rejectReason, setRejectReason] = useState('')
+  
   // 询价记录
   const [inquiries, setInquiries] = useState<Inquiry[]>([])
   const [loadingInquiries, setLoadingInquiries] = useState(false)
@@ -120,6 +158,13 @@ export default function Quote() {
   useEffect(() => {
     if (activeTab === 'history') {
       loadInquiries()
+    }
+  }, [activeTab])
+  
+  // 加载待确认的匹配结果
+  useEffect(() => {
+    if (activeTab === 'clearance') {
+      loadPendingConfirmations()
     }
   }, [activeTab])
 
@@ -150,6 +195,139 @@ export default function Quote() {
       console.error('加载询价记录失败:', error)
     } finally {
       setLoadingInquiries(false)
+    }
+  }
+
+  // 加载待确认的匹配结果
+  const loadPendingConfirmations = async () => {
+    setLoadingConfirmations(true)
+    try {
+      const res = await portalApi.getPendingConfirmations()
+      if (res.data.errCode === 200) {
+        setPendingConfirmations(res.data.data || [])
+      }
+    } catch (error) {
+      console.error('加载待确认记录失败:', error)
+    } finally {
+      setLoadingConfirmations(false)
+    }
+  }
+
+  // Excel文件上传
+  const handleFileSelect = () => {
+    fileInputRef.current?.click()
+  }
+
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    if (!file) return
+
+    // 验证文件类型
+    const validTypes = [
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', // .xlsx
+      'application/vnd.ms-excel', // .xls
+      'text/csv' // .csv
+    ]
+    if (!validTypes.includes(file.type) && !file.name.match(/\.(xlsx|xls|csv)$/i)) {
+      alert('请上传Excel文件（.xlsx, .xls）或CSV文件')
+      return
+    }
+
+    // 验证文件大小（最大10MB）
+    if (file.size > 10 * 1024 * 1024) {
+      alert('文件大小不能超过10MB')
+      return
+    }
+
+    setUploading(true)
+    try {
+      const formData = new FormData()
+      formData.append('file', file)
+
+      const res = await portalApi.uploadCargoExcel(formData)
+      
+      if (res.data.errCode === 200) {
+        const { fileId, items, fileName, fileSize } = res.data.data
+        
+        // 设置上传文件信息
+        setUploadedFile({
+          id: fileId,
+          fileName,
+          fileSize,
+          uploadedAt: new Date().toISOString(),
+          itemCount: items.length
+        })
+        
+        // 将解析后的货物项设置到列表
+        setCargoItems(items.map((item: any, index: number) => ({
+          id: `${Date.now()}-${index}`,
+          name: item.name || '',
+          hsCode: item.hsCode || '',
+          value: item.value || 0,
+          quantity: item.quantity || 1,
+          weight: item.weight || 0,
+          dutyRate: item.dutyRate || 0,
+          vatRate: item.vatRate || 19
+        })))
+        
+        alert(`成功导入 ${items.length} 项货物`)
+      } else {
+        alert(res.data.msg || '上传失败')
+      }
+    } catch (error: any) {
+      console.error('上传Excel失败:', error)
+      alert(error.response?.data?.msg || '上传失败，请稍后重试')
+    } finally {
+      setUploading(false)
+      // 重置文件输入
+      if (fileInputRef.current) {
+        fileInputRef.current.value = ''
+      }
+    }
+  }
+
+  // 删除已上传的Excel（清空货物列表）
+  const handleDeleteUpload = () => {
+    if (!confirm('确定要删除已上传的货物明细吗？')) return
+    
+    setUploadedFile(null)
+    setCargoItems([])
+    setClearanceQuote(null)
+  }
+
+  // 确认匹配结果
+  const handleConfirmMatching = async (inquiry: Inquiry) => {
+    try {
+      const res = await portalApi.confirmMatching(inquiry.id)
+      if (res.data.errCode === 200) {
+        alert('已确认匹配结果，将继续进行清关处理')
+        setSelectedConfirmation(null)
+        loadPendingConfirmations()
+        loadInquiries()
+      } else {
+        alert(res.data.msg || '操作失败')
+      }
+    } catch (error: any) {
+      alert(error.response?.data?.msg || '操作失败')
+    }
+  }
+
+  // 拒绝/取消匹配结果
+  const handleRejectMatching = async (inquiry: Inquiry, reason: string) => {
+    try {
+      const res = await portalApi.rejectMatching(inquiry.id, reason)
+      if (res.data.errCode === 200) {
+        alert('已取消该匹配结果')
+        setSelectedConfirmation(null)
+        setRejectReason('')
+        setConfirmationAction(null)
+        loadPendingConfirmations()
+        loadInquiries()
+      } else {
+        alert(res.data.msg || '操作失败')
+      }
+    } catch (error: any) {
+      alert(error.response?.data?.msg || '操作失败')
     }
   }
 
@@ -891,25 +1069,118 @@ export default function Quote() {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* 左侧：货物信息 */}
           <div className="space-y-6">
+            {/* 待确认的匹配结果提醒 */}
+            {pendingConfirmations.length > 0 && (
+              <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
+                <div className="flex items-start">
+                  <AlertCircle className="w-5 h-5 text-amber-500 mt-0.5 mr-3 flex-shrink-0" />
+                  <div className="flex-1">
+                    <h4 className="font-medium text-amber-800">
+                      有 {pendingConfirmations.length} 条待确认的匹配结果
+                    </h4>
+                    <p className="text-sm text-amber-600 mt-1">
+                      单证部门已完成货物匹配和关税计算，请及时确认
+                    </p>
+                    <div className="mt-3 space-y-2">
+                      {pendingConfirmations.map((item) => (
+                        <div 
+                          key={item.id}
+                          className="flex items-center justify-between bg-white rounded-lg p-3 border border-amber-200"
+                        >
+                          <div>
+                            <span className="font-medium text-gray-900">
+                              {item.inquiryNumber}
+                            </span>
+                            <span className="text-sm text-gray-500 ml-2">
+                              {item.matchedItems?.length || 0} 项货物
+                            </span>
+                          </div>
+                          <button
+                            onClick={() => setSelectedConfirmation(item)}
+                            className="px-3 py-1 bg-amber-500 text-white text-sm rounded-lg hover:bg-amber-600"
+                          >
+                            查看并确认
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
             <div className="bg-white rounded-lg shadow-sm border p-6">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-lg font-medium text-gray-900">
                   <Package className="w-5 h-5 inline-block mr-2 text-primary-500" />
                   货物明细
                 </h3>
-                <button
-                  onClick={addCargoItem}
-                  className="text-sm text-primary-600 hover:text-primary-700 flex items-center"
-                >
-                  <Plus className="w-4 h-4 mr-1" />
-                  添加货物
-                </button>
+                <div className="flex items-center gap-2">
+                  {/* Excel上传按钮 */}
+                  <input
+                    type="file"
+                    ref={fileInputRef}
+                    onChange={handleFileUpload}
+                    accept=".xlsx,.xls,.csv"
+                    className="hidden"
+                  />
+                  <button
+                    onClick={handleFileSelect}
+                    disabled={uploading}
+                    className="text-sm text-green-600 hover:text-green-700 flex items-center px-2 py-1 rounded-lg hover:bg-green-50"
+                  >
+                    {uploading ? (
+                      <Loader2 className="w-4 h-4 mr-1 animate-spin" />
+                    ) : (
+                      <Upload className="w-4 h-4 mr-1" />
+                    )}
+                    上传Excel
+                  </button>
+                  <button
+                    onClick={addCargoItem}
+                    className="text-sm text-primary-600 hover:text-primary-700 flex items-center px-2 py-1 rounded-lg hover:bg-primary-50"
+                  >
+                    <Plus className="w-4 h-4 mr-1" />
+                    添加货物
+                  </button>
+                </div>
               </div>
 
+              {/* 已上传文件信息 */}
+              {uploadedFile && (
+                <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-lg">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center">
+                      <FileSpreadsheet className="w-5 h-5 text-green-600 mr-2" />
+                      <div>
+                        <p className="text-sm font-medium text-green-800">
+                          {uploadedFile.fileName}
+                        </p>
+                        <p className="text-xs text-green-600">
+                          {uploadedFile.itemCount} 项货物 · 
+                          {(uploadedFile.fileSize / 1024).toFixed(1)} KB · 
+                          {new Date(uploadedFile.uploadedAt).toLocaleString('zh-CN')}
+                        </p>
+                      </div>
+                    </div>
+                    <button
+                      onClick={handleDeleteUpload}
+                      className="p-1 text-red-500 hover:bg-red-50 rounded-lg"
+                      title="删除文件"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+              )}
+
               {cargoItems.length === 0 ? (
-                <div className="text-center py-8 text-gray-500">
+                <div className="text-center py-8 text-gray-500 border-2 border-dashed border-gray-200 rounded-lg">
                   <Package className="w-10 h-10 mx-auto text-gray-300" />
                   <p className="mt-2">暂无货物，请点击"添加货物"</p>
+                  <p className="text-xs text-gray-400 mt-1">
+                    或上传Excel文件批量导入货物明细
+                  </p>
                 </div>
               ) : (
                 <div className="space-y-4">
@@ -1313,6 +1584,199 @@ export default function Quote() {
                   </button>
                 </div>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 匹配结果确认弹窗 */}
+      {selectedConfirmation && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl max-w-4xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between p-4 border-b bg-amber-50">
+              <div className="flex items-center">
+                <AlertCircle className="w-5 h-5 text-amber-500 mr-2" />
+                <h3 className="text-lg font-medium text-amber-800">
+                  待确认匹配结果 - {selectedConfirmation.inquiryNumber}
+                </h3>
+              </div>
+              <button
+                onClick={() => {
+                  setSelectedConfirmation(null)
+                  setConfirmationAction(null)
+                  setRejectReason('')
+                }}
+                className="text-gray-400 hover:text-gray-500"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            
+            <div className="p-4 space-y-4">
+              {/* 匹配信息 */}
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                <p className="text-sm text-blue-700">
+                  <span className="font-medium">单证部门已完成货物匹配</span>
+                  {selectedConfirmation.matchedAt && (
+                    <span className="text-blue-600 ml-2">
+                      匹配时间：{new Date(selectedConfirmation.matchedAt).toLocaleString('zh-CN')}
+                    </span>
+                  )}
+                </p>
+              </div>
+
+              {/* 货物匹配明细表格 */}
+              <div className="border rounded-lg overflow-hidden">
+                <table className="min-w-full divide-y divide-gray-200">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">序号</th>
+                      <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">原始品名</th>
+                      <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">匹配品名</th>
+                      <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">HS CODE</th>
+                      <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase">货值(€)</th>
+                      <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase">关税(€)</th>
+                      <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase">增值税(€)</th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {(selectedConfirmation.matchedItems || selectedConfirmation.clearanceData?.items || []).map((item: any, index: number) => (
+                      <tr key={index} className="hover:bg-gray-50">
+                        <td className="px-3 py-2 text-sm text-gray-500">{index + 1}</td>
+                        <td className="px-3 py-2 text-sm text-gray-900">
+                          {item.originalName || item.name || '-'}
+                        </td>
+                        <td className="px-3 py-2 text-sm">
+                          <span className="text-green-600 font-medium">
+                            {item.matchedName || item.name || '-'}
+                          </span>
+                        </td>
+                        <td className="px-3 py-2 text-sm font-mono text-gray-900">
+                          {item.matchedHsCode || item.hsCode || '-'}
+                        </td>
+                        <td className="px-3 py-2 text-sm text-right text-gray-900">
+                          {(item.value || 0).toFixed(2)}
+                        </td>
+                        <td className="px-3 py-2 text-sm text-right text-amber-600">
+                          {(item.calculatedDuty || 0).toFixed(2)}
+                        </td>
+                        <td className="px-3 py-2 text-sm text-right text-blue-600">
+                          {(item.calculatedVat || 0).toFixed(2)}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                  <tfoot className="bg-gray-50">
+                    <tr>
+                      <td colSpan={4} className="px-3 py-2 text-sm font-medium text-gray-900 text-right">
+                        合计：
+                      </td>
+                      <td className="px-3 py-2 text-sm font-medium text-right">
+                        €{(selectedConfirmation.clearanceData?.quote?.tax?.summary?.totalValue || 0).toFixed(2)}
+                      </td>
+                      <td className="px-3 py-2 text-sm font-medium text-right text-amber-600">
+                        €{(selectedConfirmation.estimatedDuty || 0).toFixed(2)}
+                      </td>
+                      <td className="px-3 py-2 text-sm font-medium text-right text-blue-600">
+                        €{(selectedConfirmation.estimatedVat || 0).toFixed(2)}
+                      </td>
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
+
+              {/* 费用汇总 */}
+              <div className="bg-gray-50 rounded-lg p-4">
+                <h4 className="font-medium text-gray-900 mb-3">费用汇总</h4>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <div className="text-center">
+                    <p className="text-sm text-gray-500">预估关税</p>
+                    <p className="text-lg font-bold text-amber-600">
+                      €{(selectedConfirmation.estimatedDuty || 0).toFixed(2)}
+                    </p>
+                  </div>
+                  <div className="text-center">
+                    <p className="text-sm text-gray-500">预估增值税</p>
+                    <p className="text-lg font-bold text-blue-600">
+                      €{(selectedConfirmation.estimatedVat || 0).toFixed(2)}
+                    </p>
+                  </div>
+                  <div className="text-center">
+                    <p className="text-sm text-gray-500">清关服务费</p>
+                    <p className="text-lg font-bold text-gray-900">
+                      €{(selectedConfirmation.clearanceFee || 0).toFixed(2)}
+                    </p>
+                  </div>
+                  <div className="text-center bg-primary-50 rounded-lg py-2">
+                    <p className="text-sm text-primary-600">预估总费用</p>
+                    <p className="text-xl font-bold text-primary-600">
+                      €{(selectedConfirmation.totalQuote || 0).toFixed(2)}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* 拒绝原因输入 */}
+              {confirmationAction === 'reject' && (
+                <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                  <label className="block text-sm font-medium text-red-800 mb-2">
+                    请填写取消/不同意的原因：
+                  </label>
+                  <textarea
+                    value={rejectReason}
+                    onChange={(e) => setRejectReason(e.target.value)}
+                    placeholder="请说明不同意的原因，如：品名匹配有误、关税计算不正确等"
+                    rows={3}
+                    className="w-full px-3 py-2 border border-red-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
+                  />
+                </div>
+              )}
+
+              {/* 操作按钮 */}
+              <div className="flex gap-3 pt-4 border-t">
+                {confirmationAction === 'reject' ? (
+                  <>
+                    <button
+                      onClick={() => handleRejectMatching(selectedConfirmation, rejectReason)}
+                      disabled={!rejectReason.trim()}
+                      className="flex-1 py-2.5 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:bg-gray-300 disabled:cursor-not-allowed flex items-center justify-center"
+                    >
+                      <XCircle className="w-5 h-5 mr-2" />
+                      确认取消
+                    </button>
+                    <button
+                      onClick={() => {
+                        setConfirmationAction(null)
+                        setRejectReason('')
+                      }}
+                      className="flex-1 py-2.5 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
+                    >
+                      返回
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <button
+                      onClick={() => handleConfirmMatching(selectedConfirmation)}
+                      className="flex-1 py-2.5 bg-green-600 text-white rounded-lg hover:bg-green-700 flex items-center justify-center"
+                    >
+                      <CheckCircle className="w-5 h-5 mr-2" />
+                      确认无误，继续清关
+                    </button>
+                    <button
+                      onClick={() => setConfirmationAction('reject')}
+                      className="flex-1 py-2.5 border border-red-300 text-red-600 rounded-lg hover:bg-red-50 flex items-center justify-center"
+                    >
+                      <XCircle className="w-5 h-5 mr-2" />
+                      不同意 / 取消
+                    </button>
+                  </>
+                )}
+              </div>
+
+              <p className="text-xs text-gray-500 text-center">
+                * 确认后将继续进行清关流程，取消后需重新提交或联系客服处理
+              </p>
             </div>
           </div>
         </div>
