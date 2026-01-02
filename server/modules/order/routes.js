@@ -11,22 +11,24 @@ const router = Router()
 
 /**
  * 获取订单统计 (必须放在 /:id 前面)
- * GET /api/orders/stats/summary
+ * GET /api/orders/stats
  */
-router.get('/stats/summary', authenticate, async (req, res) => {
+router.get('/stats', authenticate, async (req, res) => {
   try {
     const db = getDatabase()
     const customerId = req.customer.customerId
     
-    // 获取订单统计
+    // 获取订单统计 - 互斥状态
     const stats = await db.prepare(`
       SELECT 
         COUNT(*) as total,
-        COUNT(CASE WHEN ship_status = '在途' OR delivery_status = '运输中' THEN 1 END) as in_transit,
-        COUNT(CASE WHEN delivery_status = '已签收' OR delivery_status = '已送达' THEN 1 END) as delivered,
-        COUNT(CASE WHEN status = '待处理' OR status = '新建' THEN 1 END) as pending
+        COUNT(CASE WHEN ship_status = '未到港' THEN 1 END) as not_arrived,
+        COUNT(CASE WHEN ship_status = '已到港' AND (customs_status IS NULL OR customs_status = '' OR customs_status != '已放行') AND (delivery_status IS NULL OR delivery_status = '' OR delivery_status NOT IN ('已送达')) AND status != '已完成' THEN 1 END) as arrived,
+        COUNT(CASE WHEN customs_status = '已放行' AND (delivery_status IS NULL OR delivery_status = '' OR delivery_status NOT IN ('已送达')) AND status != '已完成' THEN 1 END) as customs_cleared,
+        COUNT(CASE WHEN delivery_status = '派送中' OR delivery_status = '待派送' THEN 1 END) as delivering,
+        COUNT(CASE WHEN delivery_status = '已送达' OR status = '已完成' THEN 1 END) as delivered
       FROM bills_of_lading
-      WHERE customer_id = ?
+      WHERE customer_id = $1
     `).get(customerId)
     
     res.json({
@@ -34,9 +36,11 @@ router.get('/stats/summary', authenticate, async (req, res) => {
       msg: 'success',
       data: {
         total: parseInt(stats?.total || 0),
-        inTransit: parseInt(stats?.in_transit || 0),
-        delivered: parseInt(stats?.delivered || 0),
-        pending: parseInt(stats?.pending || 0)
+        notArrived: parseInt(stats?.not_arrived || 0),
+        arrived: parseInt(stats?.arrived || 0),
+        customsCleared: parseInt(stats?.customs_cleared || 0),
+        delivering: parseInt(stats?.delivering || 0),
+        delivered: parseInt(stats?.delivered || 0)
       }
     })
     
@@ -48,9 +52,11 @@ router.get('/stats/summary', authenticate, async (req, res) => {
       msg: 'success',
       data: {
         total: 0,
-        inTransit: 0,
-        delivered: 0,
-        pending: 0
+        notArrived: 0,
+        arrived: 0,
+        customsCleared: 0,
+        delivering: 0,
+        delivered: 0
       }
     })
   }

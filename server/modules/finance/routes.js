@@ -15,6 +15,56 @@ const MAIN_API_URL = process.env.MAIN_API_URL || 'http://127.0.0.1:3001'
 const MAIN_API_KEY = process.env.MAIN_API_KEY || ''
 
 /**
+ * 获取应付款汇总（根路由，兼容 /api/payables）
+ * GET /api/payables 或 /api/finance
+ */
+router.get('/', authenticate, async (req, res) => {
+  try {
+    const db = getDatabase()
+    const customerId = req.customer.customerId
+    
+    // 从本地数据库获取应付款汇总
+    const summary = await db.prepare(`
+      SELECT 
+        COALESCE(SUM(CASE WHEN payment_status != '已结清' THEN total_amount ELSE 0 END), 0) as total_payable,
+        COALESCE(SUM(CASE WHEN payment_status != '已结清' AND due_date < CURRENT_DATE THEN total_amount ELSE 0 END), 0) as overdue,
+        COALESCE(SUM(CASE WHEN payment_status != '已结清' AND due_date >= CURRENT_DATE AND due_date <= CURRENT_DATE + 7 THEN total_amount ELSE 0 END), 0) as due_in_7_days,
+        COALESCE(SUM(CASE WHEN payment_status != '已结清' AND due_date >= CURRENT_DATE AND due_date <= CURRENT_DATE + 30 THEN total_amount ELSE 0 END), 0) as due_in_30_days
+      FROM invoices
+      WHERE customer_id = $1
+    `).get(customerId)
+    
+    res.json({
+      errCode: 200,
+      msg: 'success',
+      data: {
+        totalPayable: parseFloat(summary?.total_payable || 0),
+        overdue: parseFloat(summary?.overdue || 0),
+        dueIn7Days: parseFloat(summary?.due_in_7_days || 0),
+        dueIn30Days: parseFloat(summary?.due_in_30_days || 0),
+        currency: 'EUR'
+      }
+    })
+    
+  } catch (error) {
+    console.error('获取应付款汇总失败:', error.message)
+    
+    // 返回默认数据
+    res.json({
+      errCode: 200,
+      msg: 'success',
+      data: {
+        totalPayable: 0,
+        overdue: 0,
+        dueIn7Days: 0,
+        dueIn30Days: 0,
+        currency: 'EUR'
+      }
+    })
+  }
+})
+
+/**
  * 获取账单列表
  * GET /api/finance/invoices
  */

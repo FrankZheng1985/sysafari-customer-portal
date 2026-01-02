@@ -38,6 +38,9 @@ dotenv.config({ path: path.join(__dirname, '.env') })
 // 创建 Express 应用
 const app = express()
 
+// 信任代理（Nginx 反向代理）
+app.set('trust proxy', 1)
+
 // ==================== 中间件配置 ====================
 
 // 安全响应头
@@ -123,6 +126,9 @@ app.use('/api/orders', orderRoutes)
 
 // 账单/财务模块
 app.use('/api/finance', financeRoutes)
+
+// 应付款快捷路由（前端兼容）
+app.use('/api/payables', financeRoutes)
 
 // API 密钥管理模块
 app.use('/api/api-keys', apiKeysRoutes)
