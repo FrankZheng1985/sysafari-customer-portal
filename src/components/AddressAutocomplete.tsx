@@ -29,7 +29,6 @@ interface AddressAutocompleteProps {
   label?: string
   required?: boolean
   className?: string
-  locationType?: 'origin' | 'destination' | 'all' // 起运地/目的地/全部
 }
 
 export default function AddressAutocomplete({
@@ -38,8 +37,7 @@ export default function AddressAutocomplete({
   placeholder = '输入地址...',
   label,
   required = false,
-  className = '',
-  locationType = 'all'
+  className = ''
 }: AddressAutocompleteProps) {
   const [isOpen, setIsOpen] = useState(false)
   const [searchQuery, setSearchQuery] = useState(value)
