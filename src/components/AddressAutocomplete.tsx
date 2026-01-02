@@ -165,13 +165,13 @@ export default function AddressAutocomplete({
 
       // 合并结果，历史地址 > 基础数据 > HERE API
       const combined = [
-        ...historyMatches.slice(0, 3),
-        ...baseMatches.slice(0, 5),
+        ...historyMatches.slice(0, 5),
+        ...baseMatches, // 显示所有匹配的基础数据
         ...hereResults.filter(h => 
           !historyMatches.some(hist => hist.address === h.address) &&
           !baseMatches.some(base => base.address === h.address)
         )
-      ].slice(0, 10)
+      ] // 不限制总数，让用户滚动查看
 
       setSuggestions(combined)
       
@@ -190,7 +190,7 @@ export default function AddressAutocomplete({
       const baseMatches = baseLocations.filter(loc =>
         loc.label.toLowerCase().includes(query.toLowerCase())
       )
-      setSuggestions([...historyMatches.slice(0, 3), ...baseMatches.slice(0, 5)])
+      setSuggestions([...historyMatches.slice(0, 5), ...baseMatches]) // 显示所有匹配的基础数据
       setShowNewAddressHint(historyMatches.length === 0 && baseMatches.length === 0 && query.length > 5)
     } finally {
       setLoading(false)
