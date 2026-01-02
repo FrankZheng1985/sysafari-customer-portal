@@ -153,6 +153,7 @@ export const portalApi = {
   
   // ==================== 系统信息 ====================
   getHealth: () => api.get('/health'),
+  getSystemLogo: () => api.get('/system/logo'),
 
   // ==================== 从主系统获取的接口 ====================
   // 应付款（dashboard 使用）

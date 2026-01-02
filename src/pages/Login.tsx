@@ -20,7 +20,7 @@ export default function Login() {
   useEffect(() => {
     const fetchLogo = async () => {
       try {
-        const response = await portalApi.get('/system/logo')
+        const response = await portalApi.getSystemLogo()
         if (response.data.errCode === 200 && response.data.data?.logoUrl) {
           setLogoUrl(response.data.data.logoUrl)
         }
