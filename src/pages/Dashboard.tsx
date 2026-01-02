@@ -15,11 +15,11 @@ import {
 
 interface OrderStats {
   total: number
-  draft: number
-  pending: number
-  shipping: number
+  notArrived: number
   arrived: number
-  completed: number
+  customsCleared: number
+  delivering: number
+  delivered: number
 }
 
 interface PayableSummary {
@@ -51,11 +51,11 @@ export default function Dashboard() {
           const stats = statsRes.data.data
           setOrderStats({
             total: parseInt(stats.total) || 0,
-            draft: parseInt(stats.draft) || 0,
-            pending: parseInt(stats.pending) || 0,
-            shipping: parseInt(stats.shipping) || 0,
+            notArrived: parseInt(stats.notArrived) || 0,
             arrived: parseInt(stats.arrived) || 0,
-            completed: parseInt(stats.completed) || 0
+            customsCleared: parseInt(stats.customsCleared) || 0,
+            delivering: parseInt(stats.delivering) || 0,
+            delivered: parseInt(stats.delivered) || 0
           })
         }
       } catch (e) {
@@ -144,7 +144,7 @@ export default function Dashboard() {
             <div>
               <p className="text-[12px] text-gray-500">运输中</p>
               <p className="text-xl font-semibold text-blue-600 mt-1">
-                {orderStats?.shipping || 0}
+                {(orderStats?.notArrived || 0) + (orderStats?.delivering || 0)}
               </p>
             </div>
             <div className="w-10 h-10 bg-blue-50 rounded-lg flex items-center justify-center">
@@ -209,10 +209,10 @@ export default function Dashboard() {
                     </div>
                     <div>
                       <p className="text-[13px] font-medium text-gray-900">
-                        {order.billNumber || order.id}
+                        {order.orderNumber || order.billNumber || order.id}
                       </p>
                       <p className="text-[11px] text-gray-500">
-                        {order.containerNumber || '-'}
+                        {order.billNumber || order.containerNumber || '-'}
                       </p>
                     </div>
                   </div>
