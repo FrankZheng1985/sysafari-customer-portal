@@ -50,9 +50,14 @@ export default function Login() {
         <div className="absolute inset-0 bg-gradient-to-br from-primary-700 to-primary-600" />
         <div className="relative z-10 flex flex-col justify-center px-12 text-white">
           <div className="flex items-center space-x-3 mb-8">
-            <div className="w-10 h-10 bg-white rounded-lg flex items-center justify-center p-1">
-              {/* TODO: 替换为ERP Logo图片 */}
-              <img src="/logo.png" alt="BP Logistics Logo" className="w-full h-full object-contain" />
+            <div className="w-10 h-10 bg-white rounded-lg flex items-center justify-center p-1.5">
+              {/* Logo - 使用 SVG 图标 */}
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="#0ea5e9" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-full h-full">
+                <path d="M16.5 9.4 7.55 4.24"/>
+                <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
+                <polyline points="3.29 7 12 12 20.71 7"/>
+                <line x1="12" x2="12" y1="22" y2="12"/>
+              </svg>
             </div>
             <span className="text-xl font-semibold">BP Logistics Sys</span>
           </div>
@@ -97,8 +102,13 @@ export default function Login() {
         <div className="w-full max-w-sm">
           {/* 移动端 Logo */}
           <div className="lg:hidden flex items-center justify-center space-x-2 mb-6">
-            <div className="w-9 h-9 bg-white rounded-lg flex items-center justify-center p-1">
-              <img src="/logo.png" alt="BP Logistics Logo" className="w-full h-full object-contain" />
+            <div className="w-9 h-9 bg-primary-600 rounded-lg flex items-center justify-center p-1.5">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-full h-full">
+                <path d="M16.5 9.4 7.55 4.24"/>
+                <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
+                <polyline points="3.29 7 12 12 20.71 7"/>
+                <line x1="12" x2="12" y1="22" y2="12"/>
+              </svg>
             </div>
             <span className="text-lg font-semibold text-gray-800">BP Logistics 客户门户</span>
           </div>
