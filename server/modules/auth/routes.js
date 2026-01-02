@@ -7,9 +7,7 @@
 import { Router } from 'express'
 import bcrypt from 'bcryptjs'
 import axios from 'axios'
-import { getDatabase } from '../../config/database.js'
-import { generateToken, authenticate, logActivity } from '../../middleware/auth.js'
-import { v4 as uuidv4 } from 'uuid'
+import { generateToken, authenticate } from '../../middleware/auth.js'
 
 const router = Router()
 
@@ -75,39 +73,8 @@ router.post('/login', async (req, res) => {
         
         console.log('生成 Token 成功')
         
-        // 尝试保存到本地数据库（失败不影响登录）
-        try {
-          const db = getDatabase()
-          const existingCustomer = await db.prepare(`
-            SELECT id FROM portal_customers WHERE customer_id = $1
-          `).get(erpUser.customerId)
-          
-          if (!existingCustomer) {
-            const newId = uuidv4()
-            await db.prepare(`
-              INSERT INTO portal_customers 
-              (id, customer_id, email, company_name, contact_name, phone, status, login_count)
-              VALUES ($1, $2, $3, $4, $5, $6, 'active', 1)
-            `).run(
-              newId,
-              erpUser.customerId,
-              erpUser.email || loginId.toLowerCase(),
-              erpUser.customerName,
-              erpUser.username,
-              erpUser.phone
-            )
-            console.log('新客户记录已创建:', newId)
-          } else {
-            await db.prepare(`
-              UPDATE portal_customers 
-              SET login_count = login_count + 1
-              WHERE customer_id = $1
-            `).run(erpUser.customerId)
-            console.log('客户记录已更新')
-          }
-        } catch (dbError) {
-          console.error('本地数据库操作失败（不影响登录）:', dbError.message)
-        }
+        // 跳过本地数据库保存，直接使用 ERP 数据
+        console.log('使用 ERP 数据，跳过本地数据库保存')
         
         console.log('登录成功，返回响应')
         return res.json({
