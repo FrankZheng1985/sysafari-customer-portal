@@ -142,10 +142,26 @@ export default function AddressAutocomplete({
         (loc.code && loc.code.toLowerCase().includes(query.toLowerCase()))
       )
 
-      // 3. 调用 HERE API 搜索
+      // 计算本地匹配数量，决定 HERE API 的优先级
+      const localMatchCount = historyMatches.length + baseMatches.length
+      
+      // 3. 智能调用 HERE API：本地数据越少，HERE API 返回越多结果
       let hereResults: Address[] = []
+      let hereLimit = 5 // 默认值
+      
+      if (localMatchCount === 0) {
+        // 完全没有本地匹配，HERE API 优先，返回更多结果
+        hereLimit = 20
+      } else if (localMatchCount < 3) {
+        // 本地匹配很少，增加 HERE API 结果
+        hereLimit = 15
+      } else if (localMatchCount < 10) {
+        // 本地匹配中等，HERE API 作为补充
+        hereLimit = 10
+      }
+      
       try {
-        const res = await portalApi.searchAddresses({ query, limit: 5 })
+        const res = await portalApi.searchAddresses({ query, limit: hereLimit })
         if (res.data.errCode === 200 && res.data.data) {
           hereResults = (res.data.data || []).map((item: any) => ({
             label: item.title || item.address,
@@ -163,15 +179,33 @@ export default function AddressAutocomplete({
         console.warn('HERE API 搜索失败，使用基础数据:', hereError)
       }
 
-      // 合并结果，历史地址 > 基础数据 > HERE API
-      const combined = [
-        ...historyMatches.slice(0, 5),
-        ...baseMatches, // 显示所有匹配的基础数据
-        ...hereResults.filter(h => 
-          !historyMatches.some(hist => hist.address === h.address) &&
-          !baseMatches.some(base => base.address === h.address)
-        )
-      ] // 不限制总数，让用户滚动查看
+      // 合并结果：
+      // - 如果本地数据少，HERE API 结果排前面
+      // - 如果本地数据多，本地数据优先
+      let combined: Address[] = []
+      
+      if (localMatchCount < 3) {
+        // 本地数据少，HERE API 优先
+        combined = [
+          ...historyMatches,
+          ...hereResults.filter(h => 
+            !historyMatches.some(hist => 
+              hist.address.toLowerCase() === h.address.toLowerCase()
+            )
+          ),
+          ...baseMatches
+        ]
+      } else {
+        // 本地数据多，本地优先
+        combined = [
+          ...historyMatches.slice(0, 5),
+          ...baseMatches,
+          ...hereResults.filter(h => 
+            !historyMatches.some(hist => hist.address === h.address) &&
+            !baseMatches.some(base => base.address === h.address)
+          )
+        ]
+      }
 
       setSuggestions(combined)
       
@@ -190,7 +224,7 @@ export default function AddressAutocomplete({
       const baseMatches = baseLocations.filter(loc =>
         loc.label.toLowerCase().includes(query.toLowerCase())
       )
-      setSuggestions([...historyMatches.slice(0, 5), ...baseMatches]) // 显示所有匹配的基础数据
+      setSuggestions([...historyMatches, ...baseMatches])
       setShowNewAddressHint(historyMatches.length === 0 && baseMatches.length === 0 && query.length > 5)
     } finally {
       setLoading(false)
