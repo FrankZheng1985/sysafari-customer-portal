@@ -253,7 +253,7 @@ router.delete('/:id', authenticate, async (req, res) => {
     // 撤销密钥（软删除）
     await db.prepare(`
       UPDATE portal_api_keys 
-      SET status = 'revoked', revoked_at = NOW()
+      SET status = 'revoked', revoked_at = CURRENT_TIMESTAMP
       WHERE id = $1
     `).run(id)
     

@@ -134,7 +134,7 @@ export async function logActivity(params) {
     await db.prepare(`
       INSERT INTO portal_activity_logs 
       (customer_id, action, resource_type, resource_id, ip_address, user_agent, details)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
+      VALUES ($1, $2, $3, $4, $5, $6, $7)
     `).run(
       customerId,
       action,

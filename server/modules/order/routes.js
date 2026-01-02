@@ -279,7 +279,7 @@ router.get('/:id', authenticate, async (req, res) => {
         doc_swap_time, customs_release_time,
         created_at, updated_at
       FROM bills_of_lading
-      WHERE id = ? AND customer_id = ?
+      WHERE id = $1 AND customer_id = $2
     `).get(id, customerId)
     
     if (!order) {
@@ -373,7 +373,7 @@ router.get('/:id/tracking', authenticate, async (req, res) => {
       SELECT id, order_number, ship_status, customs_status, delivery_status,
              etd, eta, ata, port_of_loading, port_of_discharge, place_of_delivery
       FROM bills_of_lading
-      WHERE id = ? AND customer_id = ?
+      WHERE id = $1 AND customer_id = $2
     `).get(id, customerId)
     
     if (!order) {
