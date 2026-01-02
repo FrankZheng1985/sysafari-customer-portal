@@ -126,9 +126,123 @@ app.use('/api/orders', orderRoutes)
 
 // 账单/财务模块
 app.use('/api/finance', financeRoutes)
+app.use('/api/payables', financeRoutes)  // 前端兼容 /api/payables
 
-// 应付款快捷路由（前端兼容）
-app.use('/api/payables', financeRoutes)
+// 账单路由别名（/api/invoices -> /api/finance/invoices）
+import { authenticate, logActivity } from './middleware/auth.js'
+
+app.get('/api/invoices', authenticate, async (req, res) => {
+  try {
+    const db = getDatabase()
+    const customerId = req.customer.customerId
+    const { page = 1, pageSize = 20, status } = req.query
+    const offset = (parseInt(page) - 1) * parseInt(pageSize)
+    
+    let whereClause = 'WHERE customer_id = $1'
+    const conditions = [customerId]
+    let paramIndex = 2
+    
+    if (status) {
+      whereClause += ` AND payment_status = $${paramIndex++}`
+      conditions.push(status)
+    }
+    
+    // 获取总数
+    const countResult = await db.prepare(`
+      SELECT COUNT(*) as total FROM invoices ${whereClause}
+    `).get(...conditions)
+    
+    // 获取账单列表
+    const invoicesRaw = await db.prepare(`
+      SELECT 
+        id, invoice_number, invoice_date, due_date,
+        total_amount, paid_amount, currency, payment_status,
+        bill_number, container_numbers, notes,
+        created_at, updated_at
+      FROM invoices
+      ${whereClause}
+      ORDER BY invoice_date DESC
+      LIMIT $${paramIndex++} OFFSET $${paramIndex}
+    `).all(...conditions, parseInt(pageSize), offset)
+    
+    // 转换字段名为驼峰格式
+    const invoices = (invoicesRaw || []).map(inv => ({
+      id: inv.id,
+      invoiceNumber: inv.invoice_number,
+      invoiceDate: inv.invoice_date,
+      dueDate: inv.due_date,
+      totalAmount: parseFloat(inv.total_amount || 0),
+      paidAmount: parseFloat(inv.paid_amount || 0),
+      balance: parseFloat(inv.total_amount || 0) - parseFloat(inv.paid_amount || 0),
+      currency: inv.currency || 'EUR',
+      status: inv.payment_status || 'unpaid',
+      billNumber: inv.bill_number,
+      containerNumbers: inv.container_numbers ? JSON.parse(inv.container_numbers) : [],
+      notes: inv.notes,
+      pdfUrl: null,
+      excelUrl: null
+    }))
+    
+    res.json({
+      errCode: 200,
+      msg: 'success',
+      data: {
+        list: invoices,
+        total: parseInt(countResult?.total || 0),
+        page: parseInt(page),
+        pageSize: parseInt(pageSize)
+      }
+    })
+  } catch (error) {
+    console.error('获取账单列表失败:', error.message)
+    res.json({
+      errCode: 200,
+      msg: 'success',
+      data: { list: [], total: 0, page: 1, pageSize: 20 }
+    })
+  }
+})
+
+app.get('/api/invoices/:id', authenticate, async (req, res) => {
+  try {
+    const db = getDatabase()
+    const customerId = req.customer.customerId
+    const { id } = req.params
+    
+    const invoice = await db.prepare(`
+      SELECT * FROM invoices WHERE id = $1 AND customer_id = $2
+    `).get(id, customerId)
+    
+    if (!invoice) {
+      return res.status(404).json({ errCode: 404, msg: '账单不存在', data: null })
+    }
+    
+    res.json({
+      errCode: 200,
+      msg: 'success',
+      data: {
+        id: invoice.id,
+        invoiceNumber: invoice.invoice_number,
+        invoiceDate: invoice.invoice_date,
+        dueDate: invoice.due_date,
+        totalAmount: parseFloat(invoice.total_amount || 0),
+        paidAmount: parseFloat(invoice.paid_amount || 0),
+        balance: parseFloat(invoice.total_amount || 0) - parseFloat(invoice.paid_amount || 0),
+        currency: invoice.currency || 'EUR',
+        status: invoice.payment_status || 'unpaid',
+        billNumber: invoice.bill_number,
+        containerNumbers: invoice.container_numbers ? JSON.parse(invoice.container_numbers) : [],
+        items: invoice.items ? JSON.parse(invoice.items) : [],
+        notes: invoice.notes,
+        pdfUrl: null,
+        excelUrl: null
+      }
+    })
+  } catch (error) {
+    console.error('获取账单详情失败:', error.message)
+    res.status(500).json({ errCode: 500, msg: '获取账单详情失败', data: null })
+  }
+})
 
 // API 密钥管理模块
 app.use('/api/api-keys', apiKeysRoutes)

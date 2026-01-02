@@ -105,7 +105,7 @@ router.get('/', authenticate, async (req, res) => {
     `).get(...conditions)
     
     // 获取订单列表
-    const orders = await db.prepare(`
+    const ordersRaw = await db.prepare(`
       SELECT 
         id, order_number, bill_number, container_number,
         shipper, consignee, port_of_loading, port_of_discharge,
@@ -121,6 +121,37 @@ router.get('/', authenticate, async (req, res) => {
       LIMIT $${paramIndex++} OFFSET $${paramIndex}
     `).all(...conditions, parseInt(pageSize), offset)
     
+    // 转换字段名为驼峰格式
+    const orders = (ordersRaw || []).map(order => ({
+      id: order.id,
+      orderNumber: order.order_number,
+      billNumber: order.bill_number,
+      containerNumber: order.container_number,
+      shipper: order.shipper,
+      consignee: order.consignee,
+      portOfLoading: order.port_of_loading,
+      portOfDischarge: order.port_of_discharge,
+      placeOfDelivery: order.place_of_delivery,
+      transportMethod: order.transport_method,
+      containerType: order.container_type,
+      pieces: order.pieces,
+      weight: order.weight,
+      volume: order.volume,
+      status: order.status,
+      rawStatus: order.status,
+      shipStatus: order.ship_status,
+      customsStatus: order.customs_status,
+      deliveryStatus: order.delivery_status,
+      etd: order.etd,
+      eta: order.eta,
+      ata: order.ata,
+      externalOrderNo: order.external_order_no,
+      customerName: order.customer_name,
+      customerCode: order.customer_code,
+      createdAt: order.created_at,
+      updatedAt: order.updated_at
+    }))
+    
     // 记录活动
     await logActivity({
       customerId: req.customer.id,
@@ -132,7 +163,7 @@ router.get('/', authenticate, async (req, res) => {
       errCode: 200,
       msg: 'success',
       data: {
-        list: orders || [],
+        list: orders,
         total: parseInt(countResult?.total || 0),
         page: parseInt(page),
         pageSize: parseInt(pageSize)
