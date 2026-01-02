@@ -381,6 +381,112 @@ router.get('/truck-types', authenticate, async (req, res) => {
 })
 
 /**
+ * 推荐卡车类型
+ * GET /api/truck-types/recommend
+ * 根据货物重量和体积推荐合适的卡车类型
+ */
+router.get('/truck-types/recommend', authenticate, async (req, res) => {
+  try {
+    const db = getDatabase()
+    const { weight, volume } = req.query
+    
+    const cargoWeight = parseFloat(weight) || 0
+    const cargoVolume = parseFloat(volume) || 0
+    
+    if (cargoWeight <= 0 && cargoVolume <= 0) {
+      return res.status(400).json({ 
+        errCode: 400, 
+        msg: '请提供货物重量或体积', 
+        data: null 
+      })
+    }
+    
+    // 查询满足条件的最小卡车类型
+    const truckType = await db.prepare(`
+      SELECT 
+        id, code, name, name_en, category, description,
+        max_weight, max_volume, length, width, height,
+        base_rate_per_km, min_charge
+      FROM truck_types
+      WHERE status = 'active'
+        AND (max_weight >= $1 OR $1 = 0)
+        AND (max_volume >= $2 OR $2 = 0)
+      ORDER BY max_weight ASC
+      LIMIT 1
+    `).get(cargoWeight, cargoVolume)
+    
+    if (!truckType) {
+      // 如果没找到，返回最大的卡车类型
+      const largestTruck = await db.prepare(`
+        SELECT 
+          id, code, name, name_en, category, description,
+          max_weight, max_volume, length, width, height,
+          base_rate_per_km, min_charge
+        FROM truck_types
+        WHERE status = 'active'
+        ORDER BY max_weight DESC
+        LIMIT 1
+      `).get()
+      
+      if (largestTruck) {
+        return res.json({
+          errCode: 200,
+          msg: '货物超出最大卡车载量，推荐最大车型',
+          data: {
+            id: largestTruck.id,
+            code: largestTruck.code,
+            name: largestTruck.name,
+            nameEn: largestTruck.name_en,
+            category: largestTruck.category,
+            maxWeight: parseFloat(largestTruck.max_weight || 0),
+            maxVolume: largestTruck.max_volume ? parseFloat(largestTruck.max_volume) : null,
+            baseRatePerKm: parseFloat(largestTruck.base_rate_per_km || 0),
+            minCharge: parseFloat(largestTruck.min_charge || 0),
+            warning: '货物可能需要分批运输'
+          }
+        })
+      }
+      
+      return res.status(404).json({ errCode: 404, msg: '暂无可用卡车类型', data: null })
+    }
+    
+    res.json({
+      errCode: 200,
+      msg: 'success',
+      data: {
+        id: truckType.id,
+        code: truckType.code,
+        name: truckType.name,
+        nameEn: truckType.name_en,
+        category: truckType.category,
+        maxWeight: parseFloat(truckType.max_weight || 0),
+        maxVolume: truckType.max_volume ? parseFloat(truckType.max_volume) : null,
+        baseRatePerKm: parseFloat(truckType.base_rate_per_km || 0),
+        minCharge: parseFloat(truckType.min_charge || 0)
+      }
+    })
+  } catch (error) {
+    console.error('推荐卡车类型失败:', error.message)
+    // 返回默认推荐
+    res.json({
+      errCode: 200,
+      msg: 'success',
+      data: {
+        id: 2,
+        code: 'TRUCK_7T',
+        name: '7.5吨卡车',
+        nameEn: '7.5T Truck',
+        category: 'medium',
+        maxWeight: 7500,
+        maxVolume: 35,
+        baseRatePerKm: 1.5,
+        minCharge: 150
+      }
+    })
+  }
+})
+
+/**
  * 运输计算
  * POST /api/transport/calculate
  */
@@ -892,6 +998,109 @@ router.post('/inquiries', authenticate, async (req, res) => {
   } catch (error) {
     console.error('创建询价失败:', error.message)
     res.status(500).json({ errCode: 500, msg: '创建询价失败', data: null })
+  }
+})
+
+/**
+ * 接受报价
+ * POST /api/inquiries/:id/accept
+ */
+router.post('/inquiries/:id/accept', authenticate, async (req, res) => {
+  try {
+    const db = getDatabase()
+    const customerId = req.customer.customerId
+    const { id } = req.params
+
+    // 验证询价归属和状态
+    const inquiry = await db.prepare(`
+      SELECT * FROM customer_inquiries 
+      WHERE id = $1 AND customer_id = $2 AND status = 'quoted'
+    `).get(id, customerId)
+
+    if (!inquiry) {
+      return res.status(404).json({ errCode: 404, msg: '询价不存在或状态不正确', data: null })
+    }
+
+    // 检查报价是否过期
+    if (inquiry.valid_until && new Date(inquiry.valid_until) < new Date()) {
+      return res.status(400).json({ errCode: 400, msg: '报价已过期', data: null })
+    }
+
+    // 更新状态为已接受
+    await db.prepare(`
+      UPDATE customer_inquiries 
+      SET status = 'accepted', 
+          updated_at = CURRENT_TIMESTAMP
+      WHERE id = $1
+    `).run(id)
+
+    // 记录活动
+    await logActivity({
+      customerId: req.customer.id,
+      action: 'accept_quote',
+      resourceType: 'inquiry',
+      resourceId: id,
+      details: { inquiryNumber: inquiry.inquiry_number }
+    })
+
+    res.json({
+      errCode: 200,
+      msg: '已接受报价',
+      data: { id, status: 'accepted' }
+    })
+  } catch (error) {
+    console.error('接受报价失败:', error.message)
+    res.status(500).json({ errCode: 500, msg: '操作失败', data: null })
+  }
+})
+
+/**
+ * 拒绝报价
+ * POST /api/inquiries/:id/reject
+ */
+router.post('/inquiries/:id/reject', authenticate, async (req, res) => {
+  try {
+    const db = getDatabase()
+    const customerId = req.customer.customerId
+    const { id } = req.params
+    const { reason } = req.body
+
+    // 验证询价归属和状态
+    const inquiry = await db.prepare(`
+      SELECT * FROM customer_inquiries 
+      WHERE id = $1 AND customer_id = $2 AND status = 'quoted'
+    `).get(id, customerId)
+
+    if (!inquiry) {
+      return res.status(404).json({ errCode: 404, msg: '询价不存在或状态不正确', data: null })
+    }
+
+    // 更新状态为已拒绝
+    await db.prepare(`
+      UPDATE customer_inquiries 
+      SET status = 'rejected', 
+          reject_reason = $2,
+          updated_at = CURRENT_TIMESTAMP
+      WHERE id = $1
+    `).run(id, reason || null)
+
+    // 记录活动
+    await logActivity({
+      customerId: req.customer.id,
+      action: 'reject_quote',
+      resourceType: 'inquiry',
+      resourceId: id,
+      details: { inquiryNumber: inquiry.inquiry_number, reason }
+    })
+
+    res.json({
+      errCode: 200,
+      msg: '已拒绝报价',
+      data: { id, status: 'rejected' }
+    })
+  } catch (error) {
+    console.error('拒绝报价失败:', error.message)
+    res.status(500).json({ errCode: 500, msg: '操作失败', data: null })
   }
 })
 
