@@ -45,7 +45,6 @@ export default function AddressAutocomplete({
   const [searchQuery, setSearchQuery] = useState(value)
   const [suggestions, setSuggestions] = useState<Address[]>([])
   const [historyAddresses, setHistoryAddresses] = useState<Address[]>([])
-  const [baseLocations, setBaseLocations] = useState<Address[]>([])
   const [loading, setLoading] = useState(false)
   const [showNewAddressHint, setShowNewAddressHint] = useState(false)
   const wrapperRef = useRef<HTMLDivElement>(null)
@@ -96,28 +95,6 @@ export default function AddressAutocomplete({
       }
     } catch (error) {
       console.error('加载历史地址失败:', error)
-    }
-  }
-
-  const loadBaseLocations = async () => {
-    try {
-      const res = await portalApi.getLocations({ type: locationType })
-      if (res.data.errCode === 200) {
-        setBaseLocations((res.data.data || []).map((loc: any) => ({
-          id: loc.id,
-          label: loc.label,
-          address: loc.nameEn || loc.nameCn,
-          city: loc.city || loc.nameCn,
-          country: loc.country,
-          countryCode: loc.countryCode,
-          postalCode: loc.postalCode,
-          code: loc.code,
-          source: loc.type === 'port' ? 'port' as const : 'city' as const,
-          type: loc.type
-        })))
-      }
-    } catch (error) {
-      console.error('加载基础位置数据失败:', error)
     }
   }
 
