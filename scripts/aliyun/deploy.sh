@@ -6,7 +6,7 @@
 
 set -e
 
-APP_DIR="/var/www/sysafari-portal"
+APP_DIR="/var/www/sysafari-customer-portal"
 LOG_DIR="$APP_DIR/logs"
 BACKUP_DIR="$APP_DIR/backups"
 
@@ -40,7 +40,7 @@ npm run build
 
 # 重启 PM2 服务
 echo "🔄 重启 PM2 服务..."
-pm2 restart portal-api || pm2 start scripts/aliyun/ecosystem.config.js
+pm2 restart portal-api || pm2 start scripts/aliyun/ecosystem.config.cjs
 
 # 显示服务状态
 echo "📊 服务状态:"
