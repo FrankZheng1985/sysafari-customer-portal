@@ -14,6 +14,122 @@ const router = Router()
 const MAIN_API_URL = process.env.MAIN_API_URL || 'http://localhost:3001'
 const MAIN_API_KEY = process.env.MAIN_API_KEY || ''
 
+// ==================== 基础数据代理（从主系统获取） ====================
+
+/**
+ * 获取起运港列表
+ * GET /api/base-data/ports-of-loading
+ */
+router.get('/base-data/ports-of-loading', async (req, res) => {
+  try {
+    const { country, search } = req.query
+    const mainRes = await axios.get(`${MAIN_API_URL}/api/portal/base-data/ports-of-loading`, {
+      params: { country, search },
+      headers: { 'x-api-key': MAIN_API_KEY },
+      timeout: 10000
+    })
+    res.json(mainRes.data)
+  } catch (error) {
+    console.error('获取起运港列表失败:', error.message)
+    res.json({ errCode: 200, msg: 'success', data: [] })
+  }
+})
+
+/**
+ * 获取目的港列表
+ * GET /api/base-data/destination-ports
+ */
+router.get('/base-data/destination-ports', async (req, res) => {
+  try {
+    const { country, search } = req.query
+    const mainRes = await axios.get(`${MAIN_API_URL}/api/portal/base-data/destination-ports`, {
+      params: { country, search },
+      headers: { 'x-api-key': MAIN_API_KEY },
+      timeout: 10000
+    })
+    res.json(mainRes.data)
+  } catch (error) {
+    console.error('获取目的港列表失败:', error.message)
+    res.json({ errCode: 200, msg: 'success', data: [] })
+  }
+})
+
+/**
+ * 获取机场列表
+ * GET /api/base-data/air-ports
+ */
+router.get('/base-data/air-ports', async (req, res) => {
+  try {
+    const { country, search } = req.query
+    const mainRes = await axios.get(`${MAIN_API_URL}/api/portal/base-data/air-ports`, {
+      params: { country, search },
+      headers: { 'x-api-key': MAIN_API_KEY },
+      timeout: 10000
+    })
+    res.json(mainRes.data)
+  } catch (error) {
+    console.error('获取机场列表失败:', error.message)
+    res.json({ errCode: 200, msg: 'success', data: [] })
+  }
+})
+
+/**
+ * 获取国家列表
+ * GET /api/base-data/countries
+ */
+router.get('/base-data/countries', async (req, res) => {
+  try {
+    const { region, search } = req.query
+    const mainRes = await axios.get(`${MAIN_API_URL}/api/portal/base-data/countries`, {
+      params: { region, search },
+      headers: { 'x-api-key': MAIN_API_KEY },
+      timeout: 10000
+    })
+    res.json(mainRes.data)
+  } catch (error) {
+    console.error('获取国家列表失败:', error.message)
+    res.json({ errCode: 200, msg: 'success', data: [] })
+  }
+})
+
+/**
+ * 获取城市列表
+ * GET /api/base-data/cities
+ */
+router.get('/base-data/cities', async (req, res) => {
+  try {
+    const { countryCode, search, level } = req.query
+    const mainRes = await axios.get(`${MAIN_API_URL}/api/portal/base-data/cities`, {
+      params: { countryCode, search, level },
+      headers: { 'x-api-key': MAIN_API_KEY },
+      timeout: 10000
+    })
+    res.json(mainRes.data)
+  } catch (error) {
+    console.error('获取城市列表失败:', error.message)
+    res.json({ errCode: 200, msg: 'success', data: [] })
+  }
+})
+
+/**
+ * 获取常用位置列表（汇总港口/城市）
+ * GET /api/base-data/locations
+ */
+router.get('/base-data/locations', async (req, res) => {
+  try {
+    const { type, search } = req.query
+    const mainRes = await axios.get(`${MAIN_API_URL}/api/portal/base-data/locations`, {
+      params: { type, search },
+      headers: { 'x-api-key': MAIN_API_KEY },
+      timeout: 10000
+    })
+    res.json(mainRes.data)
+  } catch (error) {
+    console.error('获取常用位置列表失败:', error.message)
+    res.json({ errCode: 200, msg: 'success', data: [] })
+  }
+})
+
 // ==================== 地址管理 ====================
 
 /**
