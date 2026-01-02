@@ -10,6 +10,54 @@ import { authenticate, logActivity } from '../../middleware/auth.js'
 const router = Router()
 
 /**
+ * 生成订单进度步骤
+ * @param {Object} order - 订单数据
+ * @returns {Array} 进度步骤数组
+ */
+function generateProgressSteps(order) {
+  const steps = [
+    {
+      key: 'accepted',
+      label: '已接单',
+      completed: true,
+      time: order.created_at
+    },
+    {
+      key: 'shipped',
+      label: '已发运',
+      completed: !!order.etd,
+      time: order.etd || null
+    },
+    {
+      key: 'arrived',
+      label: '已到港',
+      completed: order.ship_status === '已到港' || !!order.ata,
+      time: order.ata || null
+    },
+    {
+      key: 'doc_swap',
+      label: '已换单',
+      completed: order.doc_swap_status === '已换单',
+      time: order.doc_swap_time || null
+    },
+    {
+      key: 'customs',
+      label: '已放行',
+      completed: order.customs_status === '已放行',
+      time: order.customs_release_time || null
+    },
+    {
+      key: 'delivered',
+      label: '已送达',
+      completed: order.delivery_status === '已送达' || order.status === '已完成',
+      time: order.delivery_status === '已送达' ? order.updated_at : null
+    }
+  ]
+  
+  return steps
+}
+
+/**
  * 获取订单统计 (必须放在 /:id 前面)
  * GET /api/orders/stats
  */
@@ -221,12 +269,14 @@ router.get('/:id', authenticate, async (req, res) => {
     const order = await db.prepare(`
       SELECT 
         id, order_number, bill_number, container_number,
-        shipper, consignee, port_of_loading, port_of_discharge,
+        shipper, consignee, notify_party, port_of_loading, port_of_discharge,
         place_of_delivery, transport_method, container_type,
         pieces, weight, volume, status, ship_status,
-        customs_status, delivery_status,
+        customs_status, delivery_status, doc_swap_status,
         etd, eta, ata, external_order_no,
         customer_name, customer_code,
+        vessel, voyage, description, remark,
+        doc_swap_time, customs_release_time,
         created_at, updated_at
       FROM bills_of_lading
       WHERE id = ? AND customer_id = ?
@@ -240,6 +290,49 @@ router.get('/:id', authenticate, async (req, res) => {
       })
     }
     
+    // 生成进度步骤
+    const progressSteps = generateProgressSteps(order)
+    
+    // 转换为驼峰格式
+    const orderData = {
+      id: order.id,
+      orderNumber: order.order_number,
+      billNumber: order.bill_number,
+      containerNumber: order.container_number,
+      externalOrderNo: order.external_order_no,
+      shipper: order.shipper,
+      consignee: order.consignee,
+      notifyParty: order.notify_party,
+      portOfLoading: order.port_of_loading,
+      portOfDischarge: order.port_of_discharge,
+      placeOfDelivery: order.place_of_delivery,
+      transportMethod: order.transport_method,
+      containerType: order.container_type,
+      status: order.status,
+      rawStatus: order.status,
+      shipStatus: order.ship_status,
+      customsStatus: order.customs_status,
+      deliveryStatus: order.delivery_status,
+      docSwapStatus: order.doc_swap_status,
+      docSwapTime: order.doc_swap_time,
+      customsReleaseTime: order.customs_release_time,
+      vessel: order.vessel,
+      voyage: order.voyage,
+      etd: order.etd,
+      eta: order.eta,
+      ata: order.ata,
+      pieces: order.pieces,
+      weight: order.weight,
+      volume: order.volume,
+      description: order.description,
+      remark: order.remark,
+      customerName: order.customer_name,
+      customerCode: order.customer_code,
+      createdAt: order.created_at,
+      updatedAt: order.updated_at,
+      progressSteps
+    }
+    
     // 记录活动
     await logActivity({
       customerId: req.customer.id,
@@ -251,7 +344,7 @@ router.get('/:id', authenticate, async (req, res) => {
     res.json({
       errCode: 200,
       msg: 'success',
-      data: order
+      data: orderData
     })
     
   } catch (error) {

@@ -3,7 +3,7 @@
  * 支持：1. 从客户历史地址选择 2. HERE API 自动补全 3. 输入新地址
  */
 import { useState, useEffect, useRef } from 'react'
-import { MapPin, Clock, Search, Plus, Check, Loader2 } from 'lucide-react'
+import { MapPin, Clock, Search, Plus, Loader2 } from 'lucide-react'
 import { portalApi } from '../utils/api'
 
 interface Address {
@@ -43,7 +43,7 @@ export default function AddressAutocomplete({
   const [loading, setLoading] = useState(false)
   const [showNewAddressHint, setShowNewAddressHint] = useState(false)
   const wrapperRef = useRef<HTMLDivElement>(null)
-  const debounceRef = useRef<NodeJS.Timeout>()
+  const debounceRef = useRef<ReturnType<typeof setTimeout>>()
 
   // 加载客户历史地址
   useEffect(() => {
