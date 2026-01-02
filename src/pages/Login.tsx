@@ -50,10 +50,11 @@ export default function Login() {
         <div className="absolute inset-0 bg-gradient-to-br from-primary-700 to-primary-600" />
         <div className="relative z-10 flex flex-col justify-center px-12 text-white">
           <div className="flex items-center space-x-3 mb-8">
-            <div className="w-10 h-10 bg-white/20 rounded-lg flex items-center justify-center">
-              <Package className="w-6 h-6 text-white" />
+            <div className="w-10 h-10 bg-white rounded-lg flex items-center justify-center p-1">
+              {/* TODO: 替换为ERP Logo图片 */}
+              <img src="/logo.png" alt="BP Logistics Logo" className="w-full h-full object-contain" />
             </div>
-            <span className="text-xl font-semibold">Sysafari Logistics</span>
+            <span className="text-xl font-semibold">BP Logistics Sys</span>
           </div>
           <h1 className="text-3xl font-bold mb-3">客户门户系统</h1>
           <p className="text-base text-white/80 mb-8">
@@ -96,10 +97,10 @@ export default function Login() {
         <div className="w-full max-w-sm">
           {/* 移动端 Logo */}
           <div className="lg:hidden flex items-center justify-center space-x-2 mb-6">
-            <div className="w-9 h-9 bg-primary-600 rounded-lg flex items-center justify-center">
-              <Package className="w-5 h-5 text-white" />
+            <div className="w-9 h-9 bg-white rounded-lg flex items-center justify-center p-1">
+              <img src="/logo.png" alt="BP Logistics Logo" className="w-full h-full object-contain" />
             </div>
-            <span className="text-lg font-semibold text-gray-800">Sysafari 客户门户</span>
+            <span className="text-lg font-semibold text-gray-800">BP Logistics 客户门户</span>
           </div>
 
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
@@ -176,7 +177,7 @@ export default function Login() {
           </div>
 
           <p className="mt-6 text-center text-[11px] text-gray-400">
-            © {new Date().getFullYear()} Sysafari Logistics. All rights reserved.
+            © {new Date().getFullYear()} BP Logistics Sys. All rights reserved.
           </p>
         </div>
       </div>

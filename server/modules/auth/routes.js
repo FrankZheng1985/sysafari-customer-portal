@@ -38,8 +38,8 @@ router.post('/login', async (req, res) => {
     
     // 方式1: 首先尝试从本地 portal_customers 验证（离线模式）
     let localCustomer = await db.prepare(`
-      SELECT * FROM portal_customers WHERE email = ? OR id = ?
-    `).get(loginId.toLowerCase().trim(), loginId.trim())
+      SELECT * FROM portal_customers WHERE email = ?
+    `).get(loginId.toLowerCase().trim())
     
     // 方式2: 调用 ERP API 验证
     try {
