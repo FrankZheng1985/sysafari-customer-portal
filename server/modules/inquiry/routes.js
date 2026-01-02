@@ -10,8 +10,9 @@ import { authenticate, logActivity } from '../../middleware/auth.js'
 
 const router = Router()
 
-// HERE API 配置
-const HERE_API_KEY = process.env.HERE_API_KEY || ''
+// 主系统 API 配置
+const MAIN_API_URL = process.env.MAIN_API_URL || 'http://localhost:3001'
+const MAIN_API_KEY = process.env.MAIN_API_KEY || ''
 
 // ==================== 地址管理 ====================
 
@@ -55,7 +56,7 @@ router.get('/addresses', authenticate, async (req, res) => {
 })
 
 /**
- * 搜索地址（HERE API + 历史地址）
+ * 搜索地址（通过主系统 HERE API）
  * GET /api/addresses/search
  */
 router.get('/addresses/search', authenticate, async (req, res) => {
@@ -66,40 +67,31 @@ router.get('/addresses/search', authenticate, async (req, res) => {
       return res.json({ errCode: 200, msg: 'success', data: [] })
     }
     
-    const results = []
+    let results = []
     
-    // 如果配置了 HERE API，调用搜索
-    if (HERE_API_KEY) {
-      try {
-        const hereRes = await axios.get('https://autosuggest.search.hereapi.com/v1/autosuggest', {
-          params: {
-            q: query,
-            apiKey: HERE_API_KEY,
-            limit: parseInt(limit),
-            in: 'countryCode:DEU,FRA,NLD,BEL,ITA,ESP,POL,AUT,CHE,CZE,GBR', // 欧洲主要国家
-            lang: 'en'
-          },
-          timeout: 5000
-        })
-        
-        if (hereRes.data.items) {
-          for (const item of hereRes.data.items) {
-            if (item.address) {
-              results.push({
-                title: item.title,
-                address: item.address.label || item.title,
-                city: item.address.city,
-                country: item.address.countryName,
-                postalCode: item.address.postalCode,
-                latitude: item.position?.lat,
-                longitude: item.position?.lng
-              })
-            }
-          }
-        }
-      } catch (hereError) {
-        console.error('HERE API 搜索失败:', hereError.message)
+    // 调用主系统的地址自动补全 API（使用 HERE API）
+    try {
+      const mainApiRes = await axios.get(`${MAIN_API_URL}/api/portal/addresses/autosuggest`, {
+        params: { query, limit },
+        headers: {
+          'x-api-key': MAIN_API_KEY
+        },
+        timeout: 5000
+      })
+      
+      if (mainApiRes.data.errCode === 200 && mainApiRes.data.data) {
+        results = (mainApiRes.data.data || []).map(item => ({
+          title: item.title || item.address,
+          address: item.address,
+          city: item.city,
+          country: item.country,
+          postalCode: item.postalCode,
+          latitude: item.lat,
+          longitude: item.lng
+        }))
       }
+    } catch (apiError) {
+      console.error('主系统地址自动补全 API 调用失败:', apiError.message)
     }
     
     res.json({ errCode: 200, msg: 'success', data: results })
