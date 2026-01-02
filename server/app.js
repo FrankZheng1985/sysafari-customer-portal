@@ -28,6 +28,7 @@ import authRoutes from './modules/auth/routes.js'
 import orderRoutes from './modules/order/routes.js'
 import financeRoutes from './modules/finance/routes.js'
 import apiKeysRoutes from './modules/api-keys/routes.js'
+import inquiryRoutes from './modules/inquiry/routes.js'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -246,6 +247,9 @@ app.get('/api/invoices/:id', authenticate, async (req, res) => {
 
 // API 密钥管理模块
 app.use('/api/api-keys', apiKeysRoutes)
+
+// 询价模块（卡车类型、运输计算、清关估算、询价管理）
+app.use('/api', inquiryRoutes)
 
 // ==================== 错误处理 ====================
 

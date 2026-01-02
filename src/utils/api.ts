@@ -158,23 +158,23 @@ export const portalApi = {
   // 应付款（dashboard 使用）
   getPayables: () => mainApi.get('/payables'),
   
-  // 询价相关（Quote 页面使用）
-  getInquiries: (params?: any) => mainApi.get('/inquiries', { params }),
-  getInquiryById: (id: string) => mainApi.get(`/inquiries/${id}`),
-  createInquiry: (data: any) => mainApi.post('/inquiries', data),
-  acceptQuote: (id: string) => mainApi.post(`/inquiries/${id}/accept`),
-  rejectQuote: (id: string, reason?: string) => mainApi.post(`/inquiries/${id}/reject`, { reason }),
+  // 询价相关（Quote 页面使用）- 使用门户后端 API
+  getInquiries: (params?: any) => api.get('/inquiries', { params }),
+  getInquiryById: (id: string) => api.get(`/inquiries/${id}`),
+  createInquiry: (data: any) => api.post('/inquiries', data),
+  acceptQuote: (id: string) => api.post(`/inquiries/${id}/accept`),
+  rejectQuote: (id: string, reason?: string) => api.post(`/inquiries/${id}/reject`, { reason }),
   
-  // 运输计算
-  calculateTransport: (data: any) => mainApi.post('/transport/calculate', data),
+  // 运输计算 - 使用门户后端 API
+  calculateTransport: (data: any) => api.post('/transport/calculate', data),
   
-  // 清关估算
-  estimateClearance: (data: any) => mainApi.post('/clearance/estimate', data),
+  // 清关估算 - 使用门户后端 API
+  estimateClearance: (data: any) => api.post('/clearance/estimate', data),
   
-  // 卡车类型
-  getTruckTypes: (params?: any) => mainApi.get('/truck-types', { params }),
+  // 卡车类型 - 使用门户后端 API
+  getTruckTypes: (params?: any) => api.get('/truck-types', { params }),
   recommendTruckType: (weight: number, volume: number) => 
-    mainApi.get('/truck-types/recommend', { params: { weight, volume } }),
+    api.get('/truck-types/recommend', { params: { weight, volume } }),
   
   // 地理编码
   geocodeAddress: (address: string) => mainApi.get('/geocode', { params: { address } }),

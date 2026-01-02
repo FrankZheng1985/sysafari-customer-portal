@@ -118,23 +118,31 @@ export default function Orders() {
     fetchOrders()
   }
 
-  // 获取订单综合状态
+  // 获取订单综合状态（按物流流程优先级判断）
   const getOrderStatus = (order: Order) => {
-    // 按物流流程优先级判断状态
+    // 1. 已送达（最终状态）
     if (order.deliveryStatus === '已送达' || order.rawStatus === '已完成') {
       return '已送达'
     }
+    // 2. 派送中
     if (order.deliveryStatus === '派送中' || order.deliveryStatus === '待派送') {
       return '派送中'
     }
+    // 3. 清关放行（已放行但未派送）
+    if (order.customsStatus === '已放行') {
+      return '清关放行'
+    }
+    // 4. 清关中
     if (order.customsStatus === '清关中' || order.customsStatus === '查验中') {
       return '清关中'
     }
-    if (order.shipStatus === '未到港') {
-      return '未到港'
-    }
+    // 5. 已到港（已到港但未开始清关或清关未完成）
     if (order.shipStatus === '已到港') {
       return '已到港'
+    }
+    // 6. 未到港
+    if (order.shipStatus === '未到港') {
+      return '未到港'
     }
     return '进行中'
   }
@@ -143,9 +151,10 @@ export default function Orders() {
   const getStatusColor = (status: string) => {
     const statusMap: Record<string, string> = {
       '未到港': 'bg-orange-100 text-orange-700',
-      '已到港': 'bg-blue-100 text-blue-700',
-      '清关中': 'bg-purple-100 text-purple-700',
-      '派送中': 'bg-indigo-100 text-indigo-700',
+      '已到港': 'bg-cyan-100 text-cyan-700',
+      '清关中': 'bg-yellow-100 text-yellow-700',
+      '清关放行': 'bg-purple-100 text-purple-700',
+      '派送中': 'bg-blue-100 text-blue-700',
       '已送达': 'bg-green-100 text-green-700',
       '进行中': 'bg-gray-100 text-gray-600',
     }

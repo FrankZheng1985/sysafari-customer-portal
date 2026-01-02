@@ -68,7 +68,7 @@ router.get('/stats', authenticate, async (req, res) => {
  */
 router.get('/', authenticate, async (req, res) => {
   try {
-    const { page = 1, pageSize = 20, status, keyword, startDate, endDate } = req.query
+    const { page = 1, pageSize = 20, status, keyword, startDate, endDate, shipStatus, customsStatus, deliveryStatus, billNumber } = req.query
     const db = getDatabase()
     const customerId = req.customer.customerId
     
@@ -81,6 +81,32 @@ router.get('/', authenticate, async (req, res) => {
     if (status) {
       whereClause += ` AND status = $${paramIndex++}`
       conditions.push(status)
+    }
+    
+    // 船运状态筛选
+    if (shipStatus === 'not_arrived') {
+      whereClause += ` AND ship_status = '未到港'`
+    } else if (shipStatus === 'arrived') {
+      whereClause += ` AND ship_status = '已到港' AND (customs_status IS NULL OR customs_status = '' OR customs_status != '已放行') AND (delivery_status IS NULL OR delivery_status = '' OR delivery_status NOT IN ('已送达')) AND status != '已完成'`
+    }
+    
+    // 清关状态筛选
+    if (customsStatus === 'cleared') {
+      whereClause += ` AND customs_status = '已放行' AND (delivery_status IS NULL OR delivery_status = '' OR delivery_status NOT IN ('已送达')) AND status != '已完成'`
+    }
+    
+    // 派送状态筛选
+    if (deliveryStatus === 'delivering') {
+      whereClause += ` AND (delivery_status = '派送中' OR delivery_status = '待派送')`
+    } else if (deliveryStatus === 'delivered') {
+      whereClause += ` AND (delivery_status = '已送达' OR status = '已完成')`
+    }
+    
+    // 提单号搜索
+    if (billNumber) {
+      whereClause += ` AND (bill_number ILIKE $${paramIndex} OR container_number ILIKE $${paramIndex})`
+      conditions.push(`%${billNumber}%`)
+      paramIndex++
     }
     
     if (keyword) {

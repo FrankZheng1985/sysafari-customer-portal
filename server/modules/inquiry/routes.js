@@ -1,0 +1,361 @@
+/**
+ * 询价模块路由
+ * 处理客户询价、运输计算、清关估算等
+ */
+
+import { Router } from 'express'
+import { getDatabase, generateId } from '../../config/database.js'
+import { authenticate, logActivity } from '../../middleware/auth.js'
+
+const router = Router()
+
+/**
+ * 获取卡车类型列表
+ * GET /api/truck-types
+ */
+router.get('/truck-types', authenticate, async (req, res) => {
+  try {
+    const db = getDatabase()
+    
+    const truckTypes = await db.prepare(`
+      SELECT 
+        id, code, name, name_en, category, description,
+        max_weight, max_volume, length, width, height,
+        base_rate_per_km, min_charge, status
+      FROM truck_types
+      WHERE status = 'active'
+      ORDER BY max_weight ASC
+    `).all()
+    
+    const result = (truckTypes || []).map(t => ({
+      id: t.id,
+      code: t.code,
+      name: t.name,
+      nameEn: t.name_en,
+      category: t.category,
+      description: t.description,
+      maxWeight: parseFloat(t.max_weight || 0),
+      maxVolume: t.max_volume ? parseFloat(t.max_volume) : null,
+      length: parseFloat(t.length || 0),
+      width: parseFloat(t.width || 0),
+      height: parseFloat(t.height || 0),
+      baseRatePerKm: parseFloat(t.base_rate_per_km || 0),
+      minCharge: parseFloat(t.min_charge || 0)
+    }))
+    
+    res.json({ errCode: 200, msg: 'success', data: result })
+  } catch (error) {
+    console.error('获取卡车类型失败:', error.message)
+    // 返回默认卡车类型
+    res.json({
+      errCode: 200,
+      msg: 'success',
+      data: [
+        { id: 1, code: 'VAN', name: '小型货车', nameEn: 'Van', category: 'small', maxWeight: 1500, maxVolume: 10, baseRatePerKm: 1.2, minCharge: 80 },
+        { id: 2, code: 'TRUCK_7T', name: '7.5吨卡车', nameEn: '7.5T Truck', category: 'medium', maxWeight: 7500, maxVolume: 35, baseRatePerKm: 1.5, minCharge: 150 },
+        { id: 3, code: 'TRUCK_18T', name: '18吨卡车', nameEn: '18T Truck', category: 'large', maxWeight: 18000, maxVolume: 60, baseRatePerKm: 2.0, minCharge: 250 },
+        { id: 4, code: 'TRUCK_40T', name: '40吨半挂', nameEn: '40T Semi', category: 'xlarge', maxWeight: 40000, maxVolume: 90, baseRatePerKm: 2.8, minCharge: 400 }
+      ]
+    })
+  }
+})
+
+/**
+ * 运输计算
+ * POST /api/transport/calculate
+ */
+router.post('/transport/calculate', authenticate, async (req, res) => {
+  try {
+    const { origin, destination, waypoints, truckType, weight, volume } = req.body
+    
+    if (!origin?.address || !destination?.address) {
+      return res.status(400).json({ errCode: 400, msg: '缺少起点或终点地址', data: null })
+    }
+    
+    // 简化计算：估算距离和费用
+    // 实际生产环境应调用 HERE API 或 Google Maps API
+    const estimatedDistance = 500 + Math.random() * 1000 // 500-1500 km
+    const estimatedDuration = estimatedDistance / 70 // 按平均 70 km/h 计算
+    
+    const baseRate = truckType?.baseRatePerKm || 1.5
+    const baseCost = estimatedDistance * baseRate
+    const fuelSurcharge = baseCost * 0.15
+    const tolls = estimatedDistance * 0.12
+    const totalCost = baseCost + fuelSurcharge + tolls
+    
+    res.json({
+      errCode: 200,
+      msg: 'success',
+      data: {
+        route: {
+          distance: Math.round(estimatedDistance),
+          duration: Math.round(estimatedDuration * 60), // 分钟
+          durationFormatted: `${Math.floor(estimatedDuration)}小时${Math.round((estimatedDuration % 1) * 60)}分钟`
+        },
+        cost: {
+          baseCost: Math.round(baseCost * 100) / 100,
+          transportCost: Math.round(baseCost * 100) / 100,
+          tolls: Math.round(tolls * 100) / 100,
+          fuelSurcharge: Math.round(fuelSurcharge * 100) / 100,
+          totalCost: Math.round(totalCost * 100) / 100
+        },
+        truckType: {
+          code: truckType?.code || 'TRUCK_18T',
+          name: truckType?.name || '18吨卡车'
+        }
+      }
+    })
+  } catch (error) {
+    console.error('运输计算失败:', error.message)
+    res.status(500).json({ errCode: 500, msg: '运输计算失败', data: null })
+  }
+})
+
+/**
+ * 清关费用估算
+ * POST /api/clearance/estimate
+ */
+router.post('/clearance/estimate', authenticate, async (req, res) => {
+  try {
+    const { items } = req.body
+    
+    if (!items || items.length === 0) {
+      return res.status(400).json({ errCode: 400, msg: '缺少货物信息', data: null })
+    }
+    
+    let totalDuty = 0
+    let totalVat = 0
+    let totalValue = 0
+    
+    for (const item of items) {
+      const value = (item.value || 0) * (item.quantity || 1)
+      const dutyRate = item.dutyRate || 5 // 默认关税率 5%
+      const vatRate = item.vatRate || 19 // 默认增值税率 19%
+      
+      totalValue += value
+      totalDuty += value * (dutyRate / 100)
+      totalVat += (value + totalDuty) * (vatRate / 100)
+    }
+    
+    // 清关服务费
+    const clearanceFee = Math.max(150, totalValue * 0.002) // 最低 150 欧元或货值的 0.2%
+    
+    res.json({
+      errCode: 200,
+      msg: 'success',
+      data: {
+        totalValue: Math.round(totalValue * 100) / 100,
+        estimatedDuty: Math.round(totalDuty * 100) / 100,
+        estimatedVat: Math.round(totalVat * 100) / 100,
+        clearanceFee: Math.round(clearanceFee * 100) / 100,
+        totalCost: Math.round((totalDuty + totalVat + clearanceFee) * 100) / 100,
+        currency: 'EUR'
+      }
+    })
+  } catch (error) {
+    console.error('清关估算失败:', error.message)
+    res.status(500).json({ errCode: 500, msg: '清关估算失败', data: null })
+  }
+})
+
+/**
+ * 获取客户询价列表
+ * GET /api/inquiries
+ */
+router.get('/inquiries', authenticate, async (req, res) => {
+  try {
+    const db = getDatabase()
+    const customerId = req.customer.customerId
+    const { page = 1, pageSize = 20, status } = req.query
+    const offset = (parseInt(page) - 1) * parseInt(pageSize)
+    
+    let whereClause = 'WHERE customer_id = $1'
+    const conditions = [customerId]
+    let paramIndex = 2
+    
+    if (status) {
+      whereClause += ` AND status = $${paramIndex++}`
+      conditions.push(status)
+    }
+    
+    // 获取总数
+    const countResult = await db.prepare(`
+      SELECT COUNT(*) as total FROM customer_inquiries ${whereClause}
+    `).get(...conditions)
+    
+    // 获取询价列表
+    const inquiriesRaw = await db.prepare(`
+      SELECT 
+        id, inquiry_number, customer_id, customer_name,
+        inquiry_type, status, clearance_data, transport_data,
+        estimated_duty, estimated_vat, clearance_fee,
+        transport_fee, total_quote, valid_until, notes,
+        created_at, updated_at
+      FROM customer_inquiries
+      ${whereClause}
+      ORDER BY created_at DESC
+      LIMIT $${paramIndex++} OFFSET $${paramIndex}
+    `).all(...conditions, parseInt(pageSize), offset)
+    
+    const inquiries = (inquiriesRaw || []).map(inq => ({
+      id: inq.id,
+      inquiryNumber: inq.inquiry_number,
+      customerId: inq.customer_id,
+      customerName: inq.customer_name,
+      inquiryType: inq.inquiry_type,
+      status: inq.status,
+      clearanceData: inq.clearance_data ? JSON.parse(inq.clearance_data) : null,
+      transportData: inq.transport_data ? JSON.parse(inq.transport_data) : null,
+      estimatedDuty: parseFloat(inq.estimated_duty || 0),
+      estimatedVat: parseFloat(inq.estimated_vat || 0),
+      clearanceFee: parseFloat(inq.clearance_fee || 0),
+      transportFee: parseFloat(inq.transport_fee || 0),
+      totalQuote: parseFloat(inq.total_quote || 0),
+      validUntil: inq.valid_until,
+      notes: inq.notes,
+      createdAt: inq.created_at,
+      updatedAt: inq.updated_at
+    }))
+    
+    res.json({
+      errCode: 200,
+      msg: 'success',
+      data: {
+        list: inquiries,
+        total: parseInt(countResult?.total || 0),
+        page: parseInt(page),
+        pageSize: parseInt(pageSize)
+      }
+    })
+  } catch (error) {
+    console.error('获取询价列表失败:', error.message)
+    res.json({
+      errCode: 200,
+      msg: 'success',
+      data: { list: [], total: 0, page: 1, pageSize: 20 }
+    })
+  }
+})
+
+/**
+ * 创建询价
+ * POST /api/inquiries
+ */
+router.post('/inquiries', authenticate, async (req, res) => {
+  try {
+    const db = getDatabase()
+    const customerId = req.customer.customerId
+    const customerName = req.customer.companyName || req.customer.email
+    
+    const {
+      inquiryType,
+      clearanceData,
+      transportData,
+      estimatedDuty,
+      estimatedVat,
+      clearanceFee,
+      transportFee,
+      totalQuote,
+      notes
+    } = req.body
+    
+    const id = generateId('INQ')
+    const inquiryNumber = `INQ-${Date.now().toString(36).toUpperCase()}`
+    
+    // 有效期 7 天
+    const validUntil = new Date()
+    validUntil.setDate(validUntil.getDate() + 7)
+    
+    await db.prepare(`
+      INSERT INTO customer_inquiries (
+        id, inquiry_number, customer_id, customer_name,
+        inquiry_type, status, clearance_data, transport_data,
+        estimated_duty, estimated_vat, clearance_fee,
+        transport_fee, total_quote, valid_until, notes
+      ) VALUES (
+        $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15
+      )
+    `).run(
+      id, inquiryNumber, customerId, customerName,
+      inquiryType, 'pending',
+      clearanceData ? JSON.stringify(clearanceData) : null,
+      transportData ? JSON.stringify(transportData) : null,
+      estimatedDuty || 0, estimatedVat || 0, clearanceFee || 0,
+      transportFee || 0, totalQuote || 0,
+      validUntil.toISOString().split('T')[0],
+      notes || null
+    )
+    
+    // 记录活动
+    await logActivity({
+      customerId: req.customer.id,
+      action: 'create_inquiry',
+      resourceType: 'inquiry',
+      resourceId: id,
+      details: { inquiryNumber, inquiryType }
+    })
+    
+    res.json({
+      errCode: 200,
+      msg: '询价提交成功',
+      data: {
+        id,
+        inquiryNumber,
+        status: 'pending',
+        validUntil: validUntil.toISOString().split('T')[0]
+      }
+    })
+  } catch (error) {
+    console.error('创建询价失败:', error.message)
+    res.status(500).json({ errCode: 500, msg: '创建询价失败', data: null })
+  }
+})
+
+/**
+ * 获取询价详情
+ * GET /api/inquiries/:id
+ */
+router.get('/inquiries/:id', authenticate, async (req, res) => {
+  try {
+    const db = getDatabase()
+    const customerId = req.customer.customerId
+    const { id } = req.params
+    
+    const inquiry = await db.prepare(`
+      SELECT * FROM customer_inquiries 
+      WHERE id = $1 AND customer_id = $2
+    `).get(id, customerId)
+    
+    if (!inquiry) {
+      return res.status(404).json({ errCode: 404, msg: '询价不存在', data: null })
+    }
+    
+    res.json({
+      errCode: 200,
+      msg: 'success',
+      data: {
+        id: inquiry.id,
+        inquiryNumber: inquiry.inquiry_number,
+        inquiryType: inquiry.inquiry_type,
+        status: inquiry.status,
+        clearanceData: inquiry.clearance_data ? JSON.parse(inquiry.clearance_data) : null,
+        transportData: inquiry.transport_data ? JSON.parse(inquiry.transport_data) : null,
+        estimatedDuty: parseFloat(inquiry.estimated_duty || 0),
+        estimatedVat: parseFloat(inquiry.estimated_vat || 0),
+        clearanceFee: parseFloat(inquiry.clearance_fee || 0),
+        transportFee: parseFloat(inquiry.transport_fee || 0),
+        totalQuote: parseFloat(inquiry.total_quote || 0),
+        validUntil: inquiry.valid_until,
+        notes: inquiry.notes,
+        createdAt: inquiry.created_at,
+        updatedAt: inquiry.updated_at
+      }
+    })
+  } catch (error) {
+    console.error('获取询价详情失败:', error.message)
+    res.status(500).json({ errCode: 500, msg: '获取询价详情失败', data: null })
+  }
+})
+
+export default router
+
