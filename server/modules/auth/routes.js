@@ -66,6 +66,7 @@ router.post('/login', async (req, res) => {
         const portalToken = generateToken({
           accountId: erpUser.id,
           customerId: erpUser.customerId,
+          customerCode: erpUser.customerCode,  // 添加客户代码到 token
           username: erpUser.username,
           email: erpUser.email || loginId,
           companyName: erpUser.customerName,
@@ -83,6 +84,7 @@ router.post('/login', async (req, res) => {
             customer: {
               id: erpUser.id,
               customerId: erpUser.customerId,
+              customerCode: erpUser.customerCode,  // 添加客户代码
               username: erpUser.username,
               email: erpUser.email || loginId,
               companyName: erpUser.customerName,
@@ -149,6 +151,7 @@ router.get('/me', authenticate, async (req, res) => {
       data: {
         id: req.customer.accountId,
         customerId: req.customer.customerId,
+        customerCode: req.customer.customerCode,  // 添加客户代码
         username: req.customer.username,
         email: req.customer.email,
         companyName: req.customer.companyName,

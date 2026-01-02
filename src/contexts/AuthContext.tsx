@@ -36,7 +36,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           api.defaults.headers.common['Authorization'] = `Bearer ${token}`
           const response = await api.get('/auth/me')
           if (response.data.errCode === 200) {
-            setUser(response.data.data)
+            const data = response.data.data
+            // 转换字段名
+            setUser({
+              id: data.id,
+              customerId: data.customerId,
+              customerName: data.companyName || data.customerName,
+              customerCode: data.customerCode || data.customerId,  // 优先使用 customerCode
+              username: data.username || data.email,
+              email: data.email,
+              phone: data.phone
+            })
           } else {
             // Token 无效
             handleLogout()
@@ -73,7 +83,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       id: customer.id,
       customerId: customer.customerId,
       customerName: customer.companyName,
-      customerCode: customer.customerId,
+      customerCode: customer.customerCode || customer.customerId,  // 优先使用 customerCode
       username: customer.email,
       email: customer.email,
       phone: customer.phone
