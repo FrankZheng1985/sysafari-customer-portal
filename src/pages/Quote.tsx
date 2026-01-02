@@ -5,6 +5,7 @@ import {
   Calculator, Clock, Check, X, Eye,
   AlertCircle, Loader2
 } from 'lucide-react'
+import AddressAutocomplete from '../components/AddressAutocomplete'
 
 // 类型定义
 interface TruckType {
@@ -444,32 +445,23 @@ export default function Quote() {
               </h3>
               
               <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    起点地址 <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    value={origin}
-                    onChange={(e) => setOrigin(e.target.value)}
-                    placeholder="例如：Hamburg, Germany"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                  />
-                </div>
+                <AddressAutocomplete
+                  value={origin}
+                  onChange={(value) => setOrigin(value)}
+                  label="起点地址"
+                  placeholder="输入起点地址（如：Hamburg, Germany）"
+                  required
+                />
 
                 {/* 途经点 */}
                 {waypoints.map((wp, index) => (
                   <div key={wp.id} className="flex items-center gap-2">
                     <div className="flex-1">
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        途经点 {index + 1}
-                      </label>
-                      <input
-                        type="text"
+                      <AddressAutocomplete
                         value={wp.address}
-                        onChange={(e) => updateWaypoint(wp.id, e.target.value)}
+                        onChange={(value) => updateWaypoint(wp.id, value)}
+                        label={`途经点 ${index + 1}`}
                         placeholder="卸货地址"
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                       />
                     </div>
                     <button
@@ -489,18 +481,13 @@ export default function Quote() {
                   添加途经点（多地址卸货）
                 </button>
 
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    终点地址 <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    value={destination}
-                    onChange={(e) => setDestination(e.target.value)}
-                    placeholder="例如：Munich, Germany"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                  />
-                </div>
+                <AddressAutocomplete
+                  value={destination}
+                  onChange={(value) => setDestination(value)}
+                  label="终点地址"
+                  placeholder="输入终点地址（如：Munich, Germany）"
+                  required
+                />
               </div>
             </div>
 

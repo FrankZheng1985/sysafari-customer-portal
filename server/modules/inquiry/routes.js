@@ -1,13 +1,202 @@
 /**
  * 询价模块路由
- * 处理客户询价、运输计算、清关估算等
+ * 处理客户询价、运输计算、清关估算、地址管理等
  */
 
 import { Router } from 'express'
+import axios from 'axios'
 import { getDatabase, generateId } from '../../config/database.js'
 import { authenticate, logActivity } from '../../middleware/auth.js'
 
 const router = Router()
+
+// HERE API 配置
+const HERE_API_KEY = process.env.HERE_API_KEY || ''
+
+// ==================== 地址管理 ====================
+
+/**
+ * 获取客户历史地址
+ * GET /api/addresses
+ */
+router.get('/addresses', authenticate, async (req, res) => {
+  try {
+    const db = getDatabase()
+    const customerId = req.customer.customerId
+    
+    const addresses = await db.prepare(`
+      SELECT 
+        id, label, address, city, country, postal_code,
+        latitude, longitude, use_count, status,
+        created_at, updated_at
+      FROM customer_addresses
+      WHERE customer_id = $1 AND status = 'approved'
+      ORDER BY use_count DESC, updated_at DESC
+      LIMIT 50
+    `).all(customerId)
+    
+    const result = (addresses || []).map(addr => ({
+      id: addr.id,
+      label: addr.label,
+      address: addr.address,
+      city: addr.city,
+      country: addr.country,
+      postalCode: addr.postal_code,
+      latitude: addr.latitude,
+      longitude: addr.longitude,
+      useCount: addr.use_count
+    }))
+    
+    res.json({ errCode: 200, msg: 'success', data: result })
+  } catch (error) {
+    console.error('获取客户地址失败:', error.message)
+    res.json({ errCode: 200, msg: 'success', data: [] })
+  }
+})
+
+/**
+ * 搜索地址（HERE API + 历史地址）
+ * GET /api/addresses/search
+ */
+router.get('/addresses/search', authenticate, async (req, res) => {
+  try {
+    const { query, limit = 5 } = req.query
+    
+    if (!query || query.length < 3) {
+      return res.json({ errCode: 200, msg: 'success', data: [] })
+    }
+    
+    const results = []
+    
+    // 如果配置了 HERE API，调用搜索
+    if (HERE_API_KEY) {
+      try {
+        const hereRes = await axios.get('https://autosuggest.search.hereapi.com/v1/autosuggest', {
+          params: {
+            q: query,
+            apiKey: HERE_API_KEY,
+            limit: parseInt(limit),
+            in: 'countryCode:DEU,FRA,NLD,BEL,ITA,ESP,POL,AUT,CHE,CZE,GBR', // 欧洲主要国家
+            lang: 'en'
+          },
+          timeout: 5000
+        })
+        
+        if (hereRes.data.items) {
+          for (const item of hereRes.data.items) {
+            if (item.address) {
+              results.push({
+                title: item.title,
+                address: item.address.label || item.title,
+                city: item.address.city,
+                country: item.address.countryName,
+                postalCode: item.address.postalCode,
+                latitude: item.position?.lat,
+                longitude: item.position?.lng
+              })
+            }
+          }
+        }
+      } catch (hereError) {
+        console.error('HERE API 搜索失败:', hereError.message)
+      }
+    }
+    
+    res.json({ errCode: 200, msg: 'success', data: results })
+  } catch (error) {
+    console.error('地址搜索失败:', error.message)
+    res.json({ errCode: 200, msg: 'success', data: [] })
+  }
+})
+
+/**
+ * 保存新地址（需审核）
+ * POST /api/addresses
+ */
+router.post('/addresses', authenticate, async (req, res) => {
+  try {
+    const db = getDatabase()
+    const customerId = req.customer.customerId
+    const customerName = req.customer.companyName || req.customer.email
+    
+    const { address, label, city, country, postalCode, latitude, longitude } = req.body
+    
+    if (!address) {
+      return res.status(400).json({ errCode: 400, msg: '地址不能为空', data: null })
+    }
+    
+    // 检查是否已存在相同地址
+    const existing = await db.prepare(`
+      SELECT id FROM customer_addresses 
+      WHERE customer_id = $1 AND address = $2
+    `).get(customerId, address)
+    
+    if (existing) {
+      // 更新使用次数
+      await db.prepare(`
+        UPDATE customer_addresses 
+        SET use_count = use_count + 1, updated_at = CURRENT_TIMESTAMP
+        WHERE id = $1
+      `).run(existing.id)
+      
+      return res.json({
+        errCode: 200,
+        msg: '地址已存在',
+        data: { id: existing.id, isNew: false }
+      })
+    }
+    
+    // 创建新地址（状态为待审核）
+    const id = generateId('ADDR')
+    
+    await db.prepare(`
+      INSERT INTO customer_addresses (
+        id, customer_id, customer_name, label, address, city, country, 
+        postal_code, latitude, longitude, status, use_count
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+    `).run(
+      id, customerId, customerName,
+      label || address,
+      address, city || null, country || null,
+      postalCode || null, latitude || null, longitude || null,
+      'pending', // 待审核状态
+      1
+    )
+    
+    // 创建审核任务（通知跟单员和操作经理）
+    const taskId = generateId('TASK')
+    const taskTitle = `新地址审核: ${customerName}`
+    const taskContent = `客户 ${customerName} 添加了新地址，请审核：\n${address}`
+    
+    await db.prepare(`
+      INSERT INTO address_review_tasks (
+        id, address_id, customer_id, customer_name,
+        task_type, status, address_content, notes
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+    `).run(
+      taskId, id, customerId, customerName,
+      'address_review', 'pending', address, null
+    )
+    
+    // 记录活动
+    await logActivity({
+      customerId: req.customer.id,
+      action: 'add_address',
+      resourceType: 'address',
+      resourceId: id,
+      details: { address, status: 'pending' }
+    })
+    
+    res.json({
+      errCode: 200,
+      msg: '地址已提交审核',
+      data: { id, isNew: true, status: 'pending' }
+    })
+  } catch (error) {
+    console.error('保存地址失败:', error.message)
+    res.status(500).json({ errCode: 500, msg: '保存地址失败', data: null })
+  }
+})
 
 /**
  * 获取卡车类型列表

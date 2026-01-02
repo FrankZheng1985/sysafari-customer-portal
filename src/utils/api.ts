@@ -179,6 +179,11 @@ export const portalApi = {
   // 地理编码
   geocodeAddress: (address: string) => mainApi.get('/geocode', { params: { address } }),
   
+  // 地址管理
+  getCustomerAddresses: () => api.get('/addresses'),
+  searchAddresses: (params: { query: string; limit?: number }) => api.get('/addresses/search', { params }),
+  saveNewAddress: (data: { address: string; label?: string; city?: string; country?: string; postalCode?: string; latitude?: number; longitude?: number }) => api.post('/addresses', data),
+  
   // 创建订单
   createOrder: (data: any) => mainApi.post('/orders', data),
   

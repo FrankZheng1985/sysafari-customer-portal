@@ -57,6 +57,55 @@ SELECT * FROM (VALUES
 ) AS v(code, name, name_en, category, max_weight, max_volume, length, width, height, base_rate_per_km, min_charge)
 WHERE NOT EXISTS (SELECT 1 FROM truck_types WHERE code = v.code);
 
+-- ============================================
+-- 客户地址表
+-- ============================================
+CREATE TABLE IF NOT EXISTS customer_addresses (
+    id TEXT PRIMARY KEY,
+    customer_id TEXT NOT NULL,
+    customer_name TEXT,
+    label TEXT,                                    -- 地址标签（如：仓库A、工厂）
+    address TEXT NOT NULL,                         -- 完整地址
+    city TEXT,                                     -- 城市
+    country TEXT,                                  -- 国家
+    postal_code TEXT,                              -- 邮编
+    latitude DECIMAL(10, 6),                       -- 纬度
+    longitude DECIMAL(10, 6),                      -- 经度
+    status TEXT DEFAULT 'pending',                 -- pending, approved, rejected
+    use_count INTEGER DEFAULT 0,                   -- 使用次数
+    approved_by TEXT,                              -- 审核人
+    approved_at TIMESTAMP,                         -- 审核时间
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_customer_addresses_customer ON customer_addresses(customer_id);
+CREATE INDEX IF NOT EXISTS idx_customer_addresses_status ON customer_addresses(status);
+
+-- ============================================
+-- 地址审核任务表
+-- ============================================
+CREATE TABLE IF NOT EXISTS address_review_tasks (
+    id TEXT PRIMARY KEY,
+    address_id TEXT REFERENCES customer_addresses(id) ON DELETE CASCADE,
+    customer_id TEXT NOT NULL,
+    customer_name TEXT,
+    task_type TEXT DEFAULT 'address_review',
+    status TEXT DEFAULT 'pending',                 -- pending, approved, rejected
+    address_content TEXT,                          -- 地址内容
+    assigned_to TEXT,                              -- 分配给谁
+    assigned_to_name TEXT,
+    reviewed_by TEXT,                              -- 审核人
+    reviewed_by_name TEXT,
+    reviewed_at TIMESTAMP,                         -- 审核时间
+    notes TEXT,                                    -- 备注
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_address_review_tasks_status ON address_review_tasks(status);
+CREATE INDEX IF NOT EXISTS idx_address_review_tasks_assigned ON address_review_tasks(assigned_to);
+
 -- 完成
 -- 执行：psql "$DATABASE_URL" -f scripts/sql/add-inquiry-table.sql
 
