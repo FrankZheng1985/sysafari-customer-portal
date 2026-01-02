@@ -58,30 +58,20 @@ router.post('/login', async (req, res) => {
       console.log('ERP 响应数据:', JSON.stringify(erpResponse.data))
       
       if (erpResponse.data.errCode === 200) {
-        // ERP 返回的是 data.user 而不是 data.customer
+        // ERP 返回的是 data.user 和 data.token
         const erpUser = erpResponse.data.data.user
+        const erpToken = erpResponse.data.data.token  // 使用 ERP 返回的原始 Token
         console.log('ERP 用户信息:', JSON.stringify(erpUser))
         
-        // 简化处理：直接生成 Token 返回，不保存到本地数据库
-        const token = generateToken({
-          accountId: erpUser.id,
-          customerId: erpUser.customerId,
-          username: erpUser.username,
-          email: erpUser.email || loginId,
-          companyName: erpUser.customerName
-        })
-        
-        console.log('生成 Token 成功')
-        
-        // 跳过本地数据库保存，直接使用 ERP 数据
-        console.log('使用 ERP 数据，跳过本地数据库保存')
+        // 直接使用 ERP 返回的 Token，这样后续调用 ERP API 时能通过验证
+        console.log('使用 ERP 原始 Token')
         
         console.log('登录成功，返回响应')
         return res.json({
           errCode: 200,
           msg: '登录成功',
           data: {
-            token,
+            token: erpToken,  // 使用 ERP 的 Token
             customer: {
               id: erpUser.id,
               customerId: erpUser.customerId,
