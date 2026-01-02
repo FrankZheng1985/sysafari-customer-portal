@@ -1,6 +1,7 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Outlet, NavLink, useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
+import { portalApi } from '../utils/api'
 import {
   LayoutDashboard,
   Package,
@@ -31,6 +32,22 @@ export default function Layout() {
   const navigate = useNavigate()
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [userMenuOpen, setUserMenuOpen] = useState(false)
+  const [logoUrl, setLogoUrl] = useState<string | null>(null)
+
+  // 获取系统 Logo
+  useEffect(() => {
+    const fetchLogo = async () => {
+      try {
+        const response = await portalApi.getSystemLogo()
+        if (response.data.errCode === 200 && response.data.data?.logoUrl) {
+          setLogoUrl(response.data.data.logoUrl)
+        }
+      } catch (error) {
+        console.error('获取 Logo 失败:', error)
+      }
+    }
+    fetchLogo()
+  }, [])
 
   const handleLogout = () => {
     logout()
@@ -57,8 +74,12 @@ export default function Layout() {
         {/* Logo */}
         <div className="h-14 flex items-center px-4 border-b border-gray-200 bg-primary-600">
           <div className="flex items-center space-x-2">
-            <div className="w-8 h-8 bg-white/20 rounded-lg flex items-center justify-center">
-              <Package className="w-5 h-5 text-white" />
+            <div className="w-8 h-8 bg-white rounded-lg flex items-center justify-center p-1">
+              {logoUrl ? (
+                <img src={logoUrl} alt="Logo" className="w-full h-full object-contain" />
+              ) : (
+                <Package className="w-5 h-5 text-primary-600" />
+              )}
             </div>
             <span className="text-base font-semibold text-white">客户门户</span>
           </div>
