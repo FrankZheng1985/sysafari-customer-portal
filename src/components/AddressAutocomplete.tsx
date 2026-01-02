@@ -1,9 +1,9 @@
 /**
  * 地址自动补全组件
- * 支持：1. 从客户历史地址选择 2. 从基础数据（港口/城市）选择 3. HERE API 自动补全 4. 输入新地址
+ * 支持：1. 客户历史地址 2. HERE API 实时地址搜索 3. 新地址提交审核
  */
 import { useState, useEffect, useRef } from 'react'
-import { MapPin, Clock, Search, Plus, Loader2, Anchor, Building2 } from 'lucide-react'
+import { MapPin, Clock, Search, Plus, Loader2 } from 'lucide-react'
 import { portalApi } from '../utils/api'
 
 interface Address {
@@ -57,9 +57,10 @@ export default function AddressAutocomplete({
   }, [])
 
   // 加载基础位置数据（港口/城市）
-  useEffect(() => {
-    loadBaseLocations()
-  }, [locationType])
+  // 起运地和目的地不再使用基础数据，直接用 HERE API
+  // useEffect(() => {
+  //   loadBaseLocations()
+  // }, [locationType])
 
   // 点击外部关闭
   useEffect(() => {
@@ -129,36 +130,15 @@ export default function AddressAutocomplete({
 
     setLoading(true)
     try {
-      // 1. 先搜索历史地址
+      // 1. 先搜索客户历史地址
       const historyMatches = historyAddresses.filter(addr =>
         addr.address.toLowerCase().includes(query.toLowerCase()) ||
         addr.label.toLowerCase().includes(query.toLowerCase())
       )
 
-      // 2. 搜索基础位置数据（港口/城市）
-      const baseMatches = baseLocations.filter(loc =>
-        loc.label.toLowerCase().includes(query.toLowerCase()) ||
-        (loc.address && loc.address.toLowerCase().includes(query.toLowerCase())) ||
-        (loc.code && loc.code.toLowerCase().includes(query.toLowerCase()))
-      )
-
-      // 计算本地匹配数量，决定 HERE API 的优先级
-      const localMatchCount = historyMatches.length + baseMatches.length
-      
-      // 3. 智能调用 HERE API：本地数据越少，HERE API 返回越多结果
+      // 2. 智能调用 HERE API：根据历史地址匹配数量动态调整
       let hereResults: Address[] = []
-      let hereLimit = 5 // 默认值
-      
-      if (localMatchCount === 0) {
-        // 完全没有本地匹配，HERE API 优先，返回更多结果
-        hereLimit = 20
-      } else if (localMatchCount < 3) {
-        // 本地匹配很少，增加 HERE API 结果
-        hereLimit = 15
-      } else if (localMatchCount < 10) {
-        // 本地匹配中等，HERE API 作为补充
-        hereLimit = 10
-      }
+      let hereLimit = historyMatches.length === 0 ? 20 : 10 // 没有历史地址时返回更多结果
       
       try {
         const res = await portalApi.searchAddresses({ query, limit: hereLimit })
@@ -176,36 +156,18 @@ export default function AddressAutocomplete({
           }))
         }
       } catch (hereError) {
-        console.warn('HERE API 搜索失败，使用基础数据:', hereError)
+        console.warn('HERE API 搜索失败:', hereError)
       }
 
-      // 合并结果：
-      // - 如果本地数据少，HERE API 结果排前面
-      // - 如果本地数据多，本地数据优先
-      let combined: Address[] = []
-      
-      if (localMatchCount < 3) {
-        // 本地数据少，HERE API 优先
-        combined = [
-          ...historyMatches,
-          ...hereResults.filter(h => 
-            !historyMatches.some(hist => 
-              hist.address.toLowerCase() === h.address.toLowerCase()
-            )
-          ),
-          ...baseMatches
-        ]
-      } else {
-        // 本地数据多，本地优先
-        combined = [
-          ...historyMatches.slice(0, 5),
-          ...baseMatches,
-          ...hereResults.filter(h => 
-            !historyMatches.some(hist => hist.address === h.address) &&
-            !baseMatches.some(base => base.address === h.address)
+      // 合并结果：历史地址优先，HERE API 补充
+      const combined = [
+        ...historyMatches,
+        ...hereResults.filter(h => 
+          !historyMatches.some(hist => 
+            hist.address.toLowerCase() === h.address.toLowerCase()
           )
-        ]
-      }
+        )
+      ]
 
       setSuggestions(combined)
       
@@ -217,15 +179,12 @@ export default function AddressAutocomplete({
       setShowNewAddressHint(!hasExactMatch && query.length > 5)
     } catch (error) {
       console.error('搜索地址失败:', error)
-      // 即使 API 失败，也显示历史地址和基础数据匹配
+      // 即使 API 失败，也显示历史地址匹配
       const historyMatches = historyAddresses.filter(addr =>
         addr.address.toLowerCase().includes(query.toLowerCase())
       )
-      const baseMatches = baseLocations.filter(loc =>
-        loc.label.toLowerCase().includes(query.toLowerCase())
-      )
-      setSuggestions([...historyMatches, ...baseMatches])
-      setShowNewAddressHint(historyMatches.length === 0 && baseMatches.length === 0 && query.length > 5)
+      setSuggestions(historyMatches)
+      setShowNewAddressHint(historyMatches.length === 0 && query.length > 5)
     } finally {
       setLoading(false)
     }
@@ -269,12 +228,8 @@ export default function AddressAutocomplete({
   const handleFocus = () => {
     setIsOpen(true)
     if (!searchQuery) {
-      // 显示默认选项：历史地址 + 所有基础位置数据（港口/城市）
-      const defaultOptions = [
-        ...historyAddresses.slice(0, 5),
-        ...baseLocations // 显示所有已加载的基础数据
-      ]
-      setSuggestions(defaultOptions)
+      // 只显示历史地址，不再显示基础数据（港口/城市）
+      setSuggestions(historyAddresses)
     }
   }
 
@@ -283,23 +238,15 @@ export default function AddressAutocomplete({
     if (address.source === 'history') {
       return <Clock className="w-4 h-4 text-gray-400" />
     }
-    if (address.source === 'port' || address.type === 'port') {
-      return <Anchor className="w-4 h-4 text-blue-500" />
-    }
-    if (address.source === 'city' || address.type === 'city') {
-      return <Building2 className="w-4 h-4 text-green-500" />
-    }
     if (address.source === 'here') {
       return <MapPin className="w-4 h-4 text-primary-500" />
     }
     return <MapPin className="w-4 h-4 text-gray-400" />
   }
 
-  // 根据来源分组
+  // 根据来源分组（只保留历史地址和 HERE API 结果）
   const groupedSuggestions = {
     history: suggestions.filter(s => s.source === 'history'),
-    ports: suggestions.filter(s => s.source === 'port'),
-    cities: suggestions.filter(s => s.source === 'city'),
     here: suggestions.filter(s => s.source === 'here')
   }
 
@@ -356,62 +303,6 @@ export default function AddressAutocomplete({
             </>
           )}
 
-          {/* 港口部分 */}
-          {groupedSuggestions.ports.length > 0 && (
-            <>
-              <div className="px-3 py-2 bg-blue-50 border-b">
-                <div className="flex items-center text-xs text-blue-600">
-                  <Anchor className="w-3 h-3 mr-1" />
-                  港口
-                </div>
-              </div>
-              {groupedSuggestions.ports.map((addr, index) => (
-                <button
-                  key={`port-${index}`}
-                  onClick={() => handleSelectAddress(addr)}
-                  className="w-full px-3 py-2 text-left hover:bg-blue-50 flex items-start gap-2 border-b border-gray-100"
-                >
-                  {getIcon(addr)}
-                  <div className="flex-1 min-w-0">
-                    <div className="text-sm font-medium text-gray-900 truncate">
-                      {addr.label}
-                      {addr.code && <span className="ml-1 text-xs text-blue-500">({addr.code})</span>}
-                    </div>
-                    {addr.country && (
-                      <div className="text-xs text-gray-400">{addr.country}</div>
-                    )}
-                  </div>
-                </button>
-              ))}
-            </>
-          )}
-
-          {/* 城市部分 */}
-          {groupedSuggestions.cities.length > 0 && (
-            <>
-              <div className="px-3 py-2 bg-green-50 border-b">
-                <div className="flex items-center text-xs text-green-600">
-                  <Building2 className="w-3 h-3 mr-1" />
-                  城市
-                </div>
-              </div>
-              {groupedSuggestions.cities.map((addr, index) => (
-                <button
-                  key={`city-${index}`}
-                  onClick={() => handleSelectAddress(addr)}
-                  className="w-full px-3 py-2 text-left hover:bg-green-50 flex items-start gap-2 border-b border-gray-100"
-                >
-                  {getIcon(addr)}
-                  <div className="flex-1 min-w-0">
-                    <div className="text-sm font-medium text-gray-900 truncate">{addr.label}</div>
-                    {addr.countryCode && (
-                      <div className="text-xs text-gray-400">{addr.countryCode}</div>
-                    )}
-                  </div>
-                </button>
-              ))}
-            </>
-          )}
 
           {/* HERE API 搜索结果 */}
           {groupedSuggestions.here.length > 0 && (
