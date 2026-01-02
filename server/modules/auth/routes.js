@@ -22,11 +22,18 @@ const ERP_API_URL = process.env.MAIN_API_URL || 'http://localhost:3001'
  * 通过 ERP API 验证账户，成功后在本地创建 session
  */
 router.post('/login', async (req, res) => {
+  console.log('========== 登录请求开始 ==========')
+  console.log('请求体:', JSON.stringify(req.body))
+  
   try {
     const { email, username, password } = req.body
     const loginId = email || username
     
+    console.log('loginId:', loginId)
+    console.log('password 长度:', password?.length)
+    
     if (!loginId || !password) {
+      console.log('错误: 缺少用户名或密码')
       return res.status(400).json({
         errCode: 400,
         msg: '请输入用户名/邮箱和密码',
@@ -34,14 +41,10 @@ router.post('/login', async (req, res) => {
       })
     }
     
-    const db = getDatabase()
+    // 调用 ERP API 验证
+    console.log('准备调用 ERP API:', `${ERP_API_URL}/api/portal/auth/login`)
+    console.log('发送数据:', { username: loginId, password: '***' })
     
-    // 方式1: 首先尝试从本地 portal_customers 验证（离线模式）
-    let localCustomer = await db.prepare(`
-      SELECT * FROM portal_customers WHERE email = ?
-    `).get(loginId.toLowerCase().trim())
-    
-    // 方式2: 调用 ERP API 验证
     try {
       const erpResponse = await axios.post(`${ERP_API_URL}/api/portal/auth/login`, {
         username: loginId,
@@ -53,160 +56,92 @@ router.post('/login', async (req, res) => {
         }
       })
       
+      console.log('ERP 响应状态:', erpResponse.status)
+      console.log('ERP 响应数据:', JSON.stringify(erpResponse.data))
+      
       if (erpResponse.data.errCode === 200) {
         // ERP 返回的是 data.user 而不是 data.customer
         const erpUser = erpResponse.data.data.user
+        console.log('ERP 用户信息:', JSON.stringify(erpUser))
         
-        // 同步客户信息到本地数据库
-        if (localCustomer) {
-          // 更新现有记录
-          await db.prepare(`
-            UPDATE portal_customers 
-            SET customer_id = ?,
-                company_name = ?,
-                contact_name = ?,
-                phone = ?,
-                status = 'active',
-                erp_synced_at = NOW(),
-                last_login_at = NOW(),
-                login_count = login_count + 1,
-                updated_at = NOW()
-            WHERE id = ?
-          `).run(
-            erpUser.customerId,
-            erpUser.customerName,
-            erpUser.username,
-            erpUser.phone,
-            localCustomer.id
-          )
-        } else {
-          // 创建新记录
-          const newId = uuidv4()
-          await db.prepare(`
-            INSERT INTO portal_customers 
-            (id, customer_id, email, company_name, contact_name, phone, status, erp_synced_at, last_login_at, login_count)
-            VALUES (?, ?, ?, ?, ?, ?, 'active', NOW(), NOW(), 1)
-          `).run(
-            newId,
-            erpUser.customerId,
-            erpUser.email?.toLowerCase() || loginId.toLowerCase(),
-            erpUser.customerName,
-            erpUser.username,
-            erpUser.phone
-          )
+        // 简化处理：直接生成 Token 返回，不保存到本地数据库
+        const token = generateToken({
+          accountId: erpUser.id,
+          customerId: erpUser.customerId,
+          username: erpUser.username,
+          email: erpUser.email || loginId,
+          companyName: erpUser.customerName
+        })
+        
+        console.log('生成 Token 成功')
+        
+        // 尝试保存到本地数据库（失败不影响登录）
+        try {
+          const db = getDatabase()
+          const existingCustomer = await db.prepare(`
+            SELECT id FROM portal_customers WHERE customer_id = $1
+          `).get(erpUser.customerId)
           
-          localCustomer = { 
-            id: newId, 
-            customer_id: erpUser.customerId,
-            email: erpUser.email?.toLowerCase() || loginId.toLowerCase(),
-            company_name: erpUser.customerName,
-            contact_name: erpUser.username,
-            phone: erpUser.phone
+          if (!existingCustomer) {
+            const newId = uuidv4()
+            await db.prepare(`
+              INSERT INTO portal_customers 
+              (id, customer_id, email, company_name, contact_name, phone, status, login_count)
+              VALUES ($1, $2, $3, $4, $5, $6, 'active', 1)
+            `).run(
+              newId,
+              erpUser.customerId,
+              erpUser.email || loginId.toLowerCase(),
+              erpUser.customerName,
+              erpUser.username,
+              erpUser.phone
+            )
+            console.log('新客户记录已创建:', newId)
+          } else {
+            await db.prepare(`
+              UPDATE portal_customers 
+              SET login_count = login_count + 1
+              WHERE customer_id = $1
+            `).run(erpUser.customerId)
+            console.log('客户记录已更新')
           }
+        } catch (dbError) {
+          console.error('本地数据库操作失败（不影响登录）:', dbError.message)
         }
         
-        // 生成本地 Token
-        const token = generateToken({
-          accountId: localCustomer.id,
-          customerId: localCustomer.customer_id || erpUser.customerId,
-          username: erpUser.username || loginId,
-          email: erpUser.email || localCustomer.email,
-          companyName: erpUser.customerName || localCustomer.company_name
-        })
-        
-        // 创建本地 Session
-        const sessionId = uuidv4()
-        const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) // 7天后过期
-        
-        await db.prepare(`
-          INSERT INTO portal_sessions (id, customer_id, token, ip_address, user_agent, expires_at)
-          VALUES (?, ?, ?, ?, ?, ?)
-        `).run(
-          sessionId,
-          localCustomer.id,
-          token,
-          req.ip,
-          req.get('User-Agent'),
-          expiresAt.toISOString()
-        )
-        
-        // 记录活动日志
-        await logActivity({
-          customerId: localCustomer.id,
-          action: 'login',
-          ipAddress: req.ip,
-          userAgent: req.get('User-Agent'),
-          details: { method: 'erp_api' }
-        })
-        
+        console.log('登录成功，返回响应')
         return res.json({
           errCode: 200,
           msg: '登录成功',
           data: {
             token,
             customer: {
-              id: localCustomer.id,
-              customerId: localCustomer.customer_id || erpUser.customerId,
-              username: erpUser.username || loginId,
-              email: erpUser.email || localCustomer.email,
-              companyName: erpUser.customerName || localCustomer.company_name,
-              contactPerson: erpUser.username || localCustomer.contact_name,
-              phone: erpUser.phone || localCustomer.phone
+              id: erpUser.id,
+              customerId: erpUser.customerId,
+              username: erpUser.username,
+              email: erpUser.email || loginId,
+              companyName: erpUser.customerName,
+              contactPerson: erpUser.username,
+              phone: erpUser.phone
             }
           }
+        })
+      } else {
+        console.log('ERP 返回非 200 errCode:', erpResponse.data.errCode)
+        return res.status(401).json({
+          errCode: 401,
+          msg: erpResponse.data.msg || '登录失败',
+          data: null
         })
       }
       
     } catch (erpError) {
-      console.error('ERP API 调用失败:', erpError.response?.data || erpError.message)
-      
-      // ERP 不可用时，尝试本地验证（需要有本地密码）
-      if (localCustomer && localCustomer.password_hash) {
-        const isValidPassword = await bcrypt.compare(password, localCustomer.password_hash)
-        
-        if (isValidPassword && localCustomer.status === 'active') {
-          // 本地验证成功
-          const token = generateToken({
-            accountId: localCustomer.id,
-            customerId: localCustomer.customer_id,
-            username: localCustomer.email,
-            email: localCustomer.email,
-            companyName: localCustomer.company_name
-          })
-          
-          // 更新登录时间
-          await db.prepare(`
-            UPDATE portal_customers 
-            SET last_login_at = NOW(), login_count = login_count + 1
-            WHERE id = ?
-          `).run(localCustomer.id)
-          
-          // 记录活动日志
-          await logActivity({
-            customerId: localCustomer.id,
-            action: 'login',
-            ipAddress: req.ip,
-            userAgent: req.get('User-Agent'),
-            details: { method: 'local_fallback' }
-          })
-          
-          return res.json({
-            errCode: 200,
-            msg: '登录成功（离线模式）',
-            data: {
-              token,
-              customer: {
-                id: localCustomer.id,
-                customerId: localCustomer.customer_id,
-                username: localCustomer.email,
-                email: localCustomer.email,
-                companyName: localCustomer.company_name,
-                contactPerson: localCustomer.contact_name,
-                phone: localCustomer.phone
-              }
-            }
-          })
-        }
+      console.error('ERP API 调用失败')
+      console.error('错误类型:', erpError.name)
+      console.error('错误消息:', erpError.message)
+      if (erpError.response) {
+        console.error('ERP 响应状态:', erpError.response.status)
+        console.error('ERP 响应数据:', JSON.stringify(erpError.response.data))
       }
       
       // ERP 返回的错误信息
@@ -217,17 +152,17 @@ router.post('/login', async (req, res) => {
           data: null
         })
       }
+      
+      // 网络错误等
+      return res.status(500).json({
+        errCode: 500,
+        msg: 'ERP 系统连接失败，请稍后重试',
+        data: null
+      })
     }
     
-    // 认证失败
-    return res.status(401).json({
-      errCode: 401,
-      msg: '用户名或密码错误',
-      data: null
-    })
-    
   } catch (error) {
-    console.error('登录失败:', error)
+    console.error('登录处理异常:', error)
     res.status(500).json({
       errCode: 500,
       msg: '服务器错误',
@@ -242,34 +177,19 @@ router.post('/login', async (req, res) => {
  */
 router.get('/me', authenticate, async (req, res) => {
   try {
-    const db = getDatabase()
-    
-    const customer = await db.prepare(`
-      SELECT * FROM portal_customers WHERE id = ?
-    `).get(req.customer.accountId)
-    
-    if (!customer) {
-      return res.status(404).json({
-        errCode: 404,
-        msg: '客户不存在',
-        data: null
-      })
-    }
-    
+    // 直接从 token 返回信息
     res.json({
       errCode: 200,
       msg: 'success',
       data: {
-        id: customer.id,
-        customerId: customer.customer_id,
-        username: customer.email,
-        email: customer.email,
-        companyName: customer.company_name,
-        contactPerson: customer.contact_name,
-        phone: customer.phone,
-        status: customer.status,
-        lastLoginAt: customer.last_login_at,
-        createdAt: customer.created_at
+        id: req.customer.accountId,
+        customerId: req.customer.customerId,
+        username: req.customer.username,
+        email: req.customer.email,
+        companyName: req.customer.companyName,
+        contactPerson: req.customer.username,
+        phone: null,
+        status: 'active'
       }
     })
     
@@ -286,7 +206,6 @@ router.get('/me', authenticate, async (req, res) => {
 /**
  * 修改密码
  * POST /api/auth/change-password
- * 同时更新 ERP 和本地密码
  */
 router.post('/change-password', authenticate, async (req, res) => {
   try {
@@ -308,9 +227,9 @@ router.post('/change-password', authenticate, async (req, res) => {
       })
     }
     
-    // 尝试调用 ERP API 修改密码
+    // 调用 ERP API 修改密码
     try {
-      await axios.post(`${ERP_API_URL}/api/auth/customer/change-password`, {
+      await axios.post(`${ERP_API_URL}/api/portal/auth/change-password`, {
         oldPassword,
         newPassword
       }, {
@@ -320,8 +239,14 @@ router.post('/change-password', authenticate, async (req, res) => {
         },
         timeout: 10000
       })
+      
+      res.json({
+        errCode: 200,
+        msg: '密码修改成功',
+        data: null
+      })
+      
     } catch (erpError) {
-      // 如果 ERP API 返回错误，传递错误信息
       if (erpError.response?.data?.msg) {
         return res.status(400).json({
           errCode: 400,
@@ -329,32 +254,8 @@ router.post('/change-password', authenticate, async (req, res) => {
           data: null
         })
       }
-      console.warn('ERP 密码修改失败，仅更新本地:', erpError.message)
+      throw erpError
     }
-    
-    // 更新本地密码（用于离线登录）
-    const db = getDatabase()
-    const newPasswordHash = await bcrypt.hash(newPassword, 10)
-    
-    await db.prepare(`
-      UPDATE portal_customers 
-      SET password_hash = ?, updated_at = NOW() 
-      WHERE id = ?
-    `).run(newPasswordHash, req.customer.accountId)
-    
-    // 记录活动日志
-    await logActivity({
-      customerId: req.customer.accountId,
-      action: 'change_password',
-      ipAddress: req.ip,
-      userAgent: req.get('User-Agent')
-    })
-    
-    res.json({
-      errCode: 200,
-      msg: '密码修改成功',
-      data: null
-    })
     
   } catch (error) {
     console.error('修改密码失败:', error)
@@ -372,24 +273,6 @@ router.post('/change-password', authenticate, async (req, res) => {
  */
 router.post('/logout', authenticate, async (req, res) => {
   try {
-    const db = getDatabase()
-    
-    // 使当前 session 失效
-    const token = req.headers.authorization?.replace('Bearer ', '')
-    if (token) {
-      await db.prepare(`
-        UPDATE portal_sessions SET is_active = false WHERE token = ?
-      `).run(token)
-    }
-    
-    // 记录活动日志
-    await logActivity({
-      customerId: req.customer.accountId,
-      action: 'logout',
-      ipAddress: req.ip,
-      userAgent: req.get('User-Agent')
-    })
-    
     res.json({
       errCode: 200,
       msg: '退出成功',
@@ -420,16 +303,6 @@ router.post('/refresh', authenticate, async (req, res) => {
       email: req.customer.email,
       companyName: req.customer.companyName
     })
-    
-    // 更新 Session
-    const db = getDatabase()
-    const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
-    
-    await db.prepare(`
-      UPDATE portal_sessions 
-      SET token = ?, expires_at = ? 
-      WHERE customer_id = ? AND is_active = true
-    `).run(token, expiresAt.toISOString(), req.customer.accountId)
     
     res.json({
       errCode: 200,
