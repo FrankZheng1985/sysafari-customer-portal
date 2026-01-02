@@ -195,6 +195,33 @@ router.get('/addresses', authenticate, async (req, res) => {
 })
 
 /**
+ * 获取系统 Logo（从主系统获取）
+ * GET /api/system/logo
+ * 公开接口，无需认证
+ */
+router.get('/system/logo', async (req, res) => {
+  try {
+    const mainApiRes = await axios.get(`${MAIN_API_URL}/api/system-settings`, {
+      params: { key: 'systemLogo' },
+      timeout: 5000
+    })
+    
+    if (mainApiRes.data.errCode === 200 && mainApiRes.data.data?.systemLogo) {
+      res.json({ 
+        errCode: 200, 
+        msg: 'success', 
+        data: { logoUrl: mainApiRes.data.data.systemLogo }
+      })
+    } else {
+      res.json({ errCode: 200, msg: 'success', data: { logoUrl: null } })
+    }
+  } catch (error) {
+    console.error('获取系统 Logo 失败:', error.message)
+    res.json({ errCode: 200, msg: 'success', data: { logoUrl: null } })
+  }
+})
+
+/**
  * 搜索地址（通过主系统 HERE API）
  * GET /api/addresses/search
  */

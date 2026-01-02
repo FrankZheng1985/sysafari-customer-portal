@@ -263,13 +263,15 @@ router.post('/logout', authenticate, async (req, res) => {
  */
 router.post('/refresh', authenticate, async (req, res) => {
   try {
-    // 生成新 Token
+    // 生成新 Token，包含 customerCode
     const token = generateToken({
       accountId: req.customer.accountId,
       customerId: req.customer.customerId,
+      customerCode: req.customer.customerCode,  // 添加客户代码
       username: req.customer.username,
       email: req.customer.email,
-      companyName: req.customer.companyName
+      companyName: req.customer.companyName,
+      phone: req.customer.phone
     })
     
     res.json({

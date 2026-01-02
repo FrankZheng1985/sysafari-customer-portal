@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { Eye, EyeOff, AlertCircle } from 'lucide-react'
+import { portalApi } from '../utils/api'
 
 export default function Login() {
   const [searchParams] = useSearchParams()
@@ -10,9 +11,25 @@ export default function Login() {
   const [showPassword, setShowPassword] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [logoUrl, setLogoUrl] = useState<string | null>(null)
   
   const { login } = useAuth()
   const navigate = useNavigate()
+
+  // 获取系统 Logo
+  useEffect(() => {
+    const fetchLogo = async () => {
+      try {
+        const response = await portalApi.get('/system/logo')
+        if (response.data.errCode === 200 && response.data.data?.logoUrl) {
+          setLogoUrl(response.data.data.logoUrl)
+        }
+      } catch (error) {
+        console.error('获取 Logo 失败:', error)
+      }
+    }
+    fetchLogo()
+  }, [])
 
   // 从 URL 参数自动填充用户名
   useEffect(() => {
@@ -51,13 +68,17 @@ export default function Login() {
         <div className="relative z-10 flex flex-col justify-center px-12 text-white">
           <div className="flex items-center space-x-3 mb-8">
             <div className="w-10 h-10 bg-white rounded-lg flex items-center justify-center p-1.5">
-              {/* Logo - 使用 SVG 图标 */}
-              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="#0ea5e9" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-full h-full">
-                <path d="M16.5 9.4 7.55 4.24"/>
-                <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
-                <polyline points="3.29 7 12 12 20.71 7"/>
-                <line x1="12" x2="12" y1="22" y2="12"/>
-              </svg>
+              {/* Logo - 从主系统获取 */}
+              {logoUrl ? (
+                <img src={logoUrl} alt="Logo" className="w-full h-full object-contain" />
+              ) : (
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="#0ea5e9" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-full h-full">
+                  <path d="M16.5 9.4 7.55 4.24"/>
+                  <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
+                  <polyline points="3.29 7 12 12 20.71 7"/>
+                  <line x1="12" x2="12" y1="22" y2="12"/>
+                </svg>
+              )}
             </div>
             <span className="text-xl font-semibold">BP Logistics Sys</span>
           </div>
@@ -102,13 +123,17 @@ export default function Login() {
         <div className="w-full max-w-sm">
           {/* 移动端 Logo */}
           <div className="lg:hidden flex items-center justify-center space-x-2 mb-6">
-            <div className="w-9 h-9 bg-primary-600 rounded-lg flex items-center justify-center p-1.5">
-              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-full h-full">
-                <path d="M16.5 9.4 7.55 4.24"/>
-                <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
-                <polyline points="3.29 7 12 12 20.71 7"/>
-                <line x1="12" x2="12" y1="22" y2="12"/>
-              </svg>
+            <div className="w-9 h-9 bg-white rounded-lg flex items-center justify-center p-1.5 shadow-sm">
+              {logoUrl ? (
+                <img src={logoUrl} alt="Logo" className="w-full h-full object-contain" />
+              ) : (
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="#0ea5e9" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-full h-full">
+                  <path d="M16.5 9.4 7.55 4.24"/>
+                  <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
+                  <polyline points="3.29 7 12 12 20.71 7"/>
+                  <line x1="12" x2="12" y1="22" y2="12"/>
+                </svg>
+              )}
             </div>
             <span className="text-lg font-semibold text-gray-800">BP Logistics 客户门户</span>
           </div>
