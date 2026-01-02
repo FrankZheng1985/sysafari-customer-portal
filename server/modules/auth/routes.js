@@ -54,7 +54,8 @@ router.post('/login', async (req, res) => {
       })
       
       if (erpResponse.data.errCode === 200) {
-        const erpCustomer = erpResponse.data.data.customer
+        // ERP 返回的是 data.user 而不是 data.customer
+        const erpUser = erpResponse.data.data.user
         
         // 同步客户信息到本地数据库
         if (localCustomer) {
@@ -72,45 +73,45 @@ router.post('/login', async (req, res) => {
                 updated_at = NOW()
             WHERE id = ?
           `).run(
-            erpCustomer.customerId,
-            erpCustomer.companyName,
-            erpCustomer.contactPerson,
-            erpCustomer.phone,
+            erpUser.customerId,
+            erpUser.customerName,
+            erpUser.username,
+            erpUser.phone,
             localCustomer.id
           )
         } else {
           // 创建新记录
-          const newId = erpCustomer.id || uuidv4()
+          const newId = uuidv4()
           await db.prepare(`
             INSERT INTO portal_customers 
             (id, customer_id, email, company_name, contact_name, phone, status, erp_synced_at, last_login_at, login_count)
             VALUES (?, ?, ?, ?, ?, ?, 'active', NOW(), NOW(), 1)
           `).run(
             newId,
-            erpCustomer.customerId,
-            erpCustomer.email?.toLowerCase() || loginId.toLowerCase(),
-            erpCustomer.companyName,
-            erpCustomer.contactPerson,
-            erpCustomer.phone
+            erpUser.customerId,
+            erpUser.email?.toLowerCase() || loginId.toLowerCase(),
+            erpUser.customerName,
+            erpUser.username,
+            erpUser.phone
           )
           
           localCustomer = { 
             id: newId, 
-            customer_id: erpCustomer.customerId,
-            email: erpCustomer.email?.toLowerCase() || loginId.toLowerCase(),
-            company_name: erpCustomer.companyName,
-            contact_name: erpCustomer.contactPerson,
-            phone: erpCustomer.phone
+            customer_id: erpUser.customerId,
+            email: erpUser.email?.toLowerCase() || loginId.toLowerCase(),
+            company_name: erpUser.customerName,
+            contact_name: erpUser.username,
+            phone: erpUser.phone
           }
         }
         
         // 生成本地 Token
         const token = generateToken({
           accountId: localCustomer.id,
-          customerId: localCustomer.customer_id || erpCustomer.customerId,
-          username: erpCustomer.username || loginId,
-          email: erpCustomer.email || localCustomer.email,
-          companyName: erpCustomer.companyName || localCustomer.company_name
+          customerId: localCustomer.customer_id || erpUser.customerId,
+          username: erpUser.username || loginId,
+          email: erpUser.email || localCustomer.email,
+          companyName: erpUser.customerName || localCustomer.company_name
         })
         
         // 创建本地 Session
@@ -145,12 +146,12 @@ router.post('/login', async (req, res) => {
             token,
             customer: {
               id: localCustomer.id,
-              customerId: localCustomer.customer_id || erpCustomer.customerId,
-              username: erpCustomer.username || loginId,
-              email: erpCustomer.email || localCustomer.email,
-              companyName: erpCustomer.companyName || localCustomer.company_name,
-              contactPerson: erpCustomer.contactPerson || localCustomer.contact_name,
-              phone: erpCustomer.phone || localCustomer.phone
+              customerId: localCustomer.customer_id || erpUser.customerId,
+              username: erpUser.username || loginId,
+              email: erpUser.email || localCustomer.email,
+              companyName: erpUser.customerName || localCustomer.company_name,
+              contactPerson: erpUser.username || localCustomer.contact_name,
+              phone: erpUser.phone || localCustomer.phone
             }
           }
         })
