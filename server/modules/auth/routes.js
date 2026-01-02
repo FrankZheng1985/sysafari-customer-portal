@@ -44,7 +44,7 @@ router.post('/login', async (req, res) => {
     // 方式2: 调用 ERP API 验证
     try {
       const erpResponse = await axios.post(`${ERP_API_URL}/api/portal/auth/login`, {
-        email: loginId,
+        username: loginId,
         password: password
       }, {
         timeout: 10000,
