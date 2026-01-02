@@ -1,9 +1,9 @@
 /**
  * 地址自动补全组件
- * 支持：1. 从客户历史地址选择 2. HERE API 自动补全 3. 输入新地址
+ * 支持：1. 从客户历史地址选择 2. 从基础数据（港口/城市）选择 3. HERE API 自动补全 4. 输入新地址
  */
 import { useState, useEffect, useRef } from 'react'
-import { MapPin, Clock, Search, Plus, Loader2 } from 'lucide-react'
+import { MapPin, Clock, Search, Plus, Loader2, Anchor, Building2 } from 'lucide-react'
 import { portalApi } from '../utils/api'
 
 interface Address {
@@ -12,11 +12,14 @@ interface Address {
   address: string
   city?: string
   country?: string
+  countryCode?: string
   postalCode?: string
   latitude?: number
   longitude?: number
   isNew?: boolean
-  source?: 'history' | 'here' | 'manual'
+  source?: 'history' | 'here' | 'manual' | 'port' | 'city'
+  type?: 'port' | 'city' | 'address'
+  code?: string
 }
 
 interface AddressAutocompleteProps {
@@ -26,6 +29,7 @@ interface AddressAutocompleteProps {
   label?: string
   required?: boolean
   className?: string
+  locationType?: 'origin' | 'destination' | 'all' // 起运地/目的地/全部
 }
 
 export default function AddressAutocomplete({
@@ -34,12 +38,14 @@ export default function AddressAutocomplete({
   placeholder = '输入地址...',
   label,
   required = false,
-  className = ''
+  className = '',
+  locationType = 'all'
 }: AddressAutocompleteProps) {
   const [isOpen, setIsOpen] = useState(false)
   const [searchQuery, setSearchQuery] = useState(value)
   const [suggestions, setSuggestions] = useState<Address[]>([])
   const [historyAddresses, setHistoryAddresses] = useState<Address[]>([])
+  const [baseLocations, setBaseLocations] = useState<Address[]>([])
   const [loading, setLoading] = useState(false)
   const [showNewAddressHint, setShowNewAddressHint] = useState(false)
   const wrapperRef = useRef<HTMLDivElement>(null)
@@ -49,6 +55,11 @@ export default function AddressAutocomplete({
   useEffect(() => {
     loadHistoryAddresses()
   }, [])
+
+  // 加载基础位置数据（港口/城市）
+  useEffect(() => {
+    loadBaseLocations()
+  }, [locationType])
 
   // 点击外部关闭
   useEffect(() => {
@@ -87,8 +98,30 @@ export default function AddressAutocomplete({
     }
   }
 
+  const loadBaseLocations = async () => {
+    try {
+      const res = await portalApi.getLocations({ type: locationType })
+      if (res.data.errCode === 200) {
+        setBaseLocations((res.data.data || []).map((loc: any) => ({
+          id: loc.id,
+          label: loc.label,
+          address: loc.nameEn || loc.nameCn,
+          city: loc.city || loc.nameCn,
+          country: loc.country,
+          countryCode: loc.countryCode,
+          postalCode: loc.postalCode,
+          code: loc.code,
+          source: loc.type === 'port' ? 'port' as const : 'city' as const,
+          type: loc.type
+        })))
+      }
+    } catch (error) {
+      console.error('加载基础位置数据失败:', error)
+    }
+  }
+
   const searchAddresses = async (query: string) => {
-    if (!query || query.length < 3) {
+    if (!query || query.length < 2) {
       setSuggestions([])
       setShowNewAddressHint(false)
       return
@@ -96,16 +129,25 @@ export default function AddressAutocomplete({
 
     setLoading(true)
     try {
-      // 先搜索历史地址
+      // 1. 先搜索历史地址
       const historyMatches = historyAddresses.filter(addr =>
         addr.address.toLowerCase().includes(query.toLowerCase()) ||
         addr.label.toLowerCase().includes(query.toLowerCase())
       )
 
-      // 调用 HERE API 搜索
-      const res = await portalApi.searchAddresses({ query, limit: 5 })
-      const hereResults: Address[] = res.data.errCode === 200 
-        ? (res.data.data || []).map((item: any) => ({
+      // 2. 搜索基础位置数据（港口/城市）
+      const baseMatches = baseLocations.filter(loc =>
+        loc.label.toLowerCase().includes(query.toLowerCase()) ||
+        (loc.address && loc.address.toLowerCase().includes(query.toLowerCase())) ||
+        (loc.code && loc.code.toLowerCase().includes(query.toLowerCase()))
+      )
+
+      // 3. 调用 HERE API 搜索
+      let hereResults: Address[] = []
+      try {
+        const res = await portalApi.searchAddresses({ query, limit: 5 })
+        if (res.data.errCode === 200 && res.data.data) {
+          hereResults = (res.data.data || []).map((item: any) => ({
             label: item.title || item.address,
             address: item.address,
             city: item.city,
@@ -113,31 +155,43 @@ export default function AddressAutocomplete({
             postalCode: item.postalCode,
             latitude: item.latitude,
             longitude: item.longitude,
-            source: 'here' as const
+            source: 'here' as const,
+            type: 'address' as const
           }))
-        : []
+        }
+      } catch (hereError) {
+        console.warn('HERE API 搜索失败，使用基础数据:', hereError)
+      }
 
-      // 合并结果，历史地址优先
+      // 合并结果，历史地址 > 基础数据 > HERE API
       const combined = [
         ...historyMatches.slice(0, 3),
-        ...hereResults.filter(h => !historyMatches.some(hist => hist.address === h.address))
-      ].slice(0, 8)
+        ...baseMatches.slice(0, 5),
+        ...hereResults.filter(h => 
+          !historyMatches.some(hist => hist.address === h.address) &&
+          !baseMatches.some(base => base.address === h.address)
+        )
+      ].slice(0, 10)
 
       setSuggestions(combined)
       
       // 如果没有完全匹配的结果，显示添加新地址提示
       const hasExactMatch = combined.some(addr => 
-        addr.address.toLowerCase() === query.toLowerCase()
+        addr.address.toLowerCase() === query.toLowerCase() ||
+        addr.label.toLowerCase() === query.toLowerCase()
       )
       setShowNewAddressHint(!hasExactMatch && query.length > 5)
     } catch (error) {
       console.error('搜索地址失败:', error)
-      // 即使 API 失败，也显示历史地址匹配
+      // 即使 API 失败，也显示历史地址和基础数据匹配
       const historyMatches = historyAddresses.filter(addr =>
         addr.address.toLowerCase().includes(query.toLowerCase())
       )
-      setSuggestions(historyMatches.slice(0, 5))
-      setShowNewAddressHint(historyMatches.length === 0 && query.length > 5)
+      const baseMatches = baseLocations.filter(loc =>
+        loc.label.toLowerCase().includes(query.toLowerCase())
+      )
+      setSuggestions([...historyMatches.slice(0, 3), ...baseMatches.slice(0, 5)])
+      setShowNewAddressHint(historyMatches.length === 0 && baseMatches.length === 0 && query.length > 5)
     } finally {
       setLoading(false)
     }
@@ -159,8 +213,8 @@ export default function AddressAutocomplete({
   }
 
   const handleSelectAddress = (address: Address) => {
-    setSearchQuery(address.address)
-    onChange(address.address, address)
+    setSearchQuery(address.label || address.address)
+    onChange(address.label || address.address, address)
     setIsOpen(false)
     setSuggestions([])
   }
@@ -180,10 +234,39 @@ export default function AddressAutocomplete({
 
   const handleFocus = () => {
     setIsOpen(true)
-    if (!searchQuery && historyAddresses.length > 0) {
-      // 显示最近使用的地址
-      setSuggestions(historyAddresses.slice(0, 5))
+    if (!searchQuery) {
+      // 显示默认选项：历史地址 + 常用港口/城市
+      const defaultOptions = [
+        ...historyAddresses.slice(0, 3),
+        ...baseLocations.slice(0, 5)
+      ]
+      setSuggestions(defaultOptions)
     }
+  }
+
+  // 根据类型获取图标
+  const getIcon = (address: Address) => {
+    if (address.source === 'history') {
+      return <Clock className="w-4 h-4 text-gray-400" />
+    }
+    if (address.source === 'port' || address.type === 'port') {
+      return <Anchor className="w-4 h-4 text-blue-500" />
+    }
+    if (address.source === 'city' || address.type === 'city') {
+      return <Building2 className="w-4 h-4 text-green-500" />
+    }
+    if (address.source === 'here') {
+      return <MapPin className="w-4 h-4 text-primary-500" />
+    }
+    return <MapPin className="w-4 h-4 text-gray-400" />
+  }
+
+  // 根据来源分组
+  const groupedSuggestions = {
+    history: suggestions.filter(s => s.source === 'history'),
+    ports: suggestions.filter(s => s.source === 'port'),
+    cities: suggestions.filter(s => s.source === 'city'),
+    here: suggestions.filter(s => s.source === 'here')
   }
 
   return (
@@ -210,60 +293,118 @@ export default function AddressAutocomplete({
       </div>
 
       {/* 下拉建议列表 */}
-      {isOpen && (suggestions.length > 0 || showNewAddressHint || historyAddresses.length > 0) && (
+      {isOpen && (suggestions.length > 0 || showNewAddressHint) && (
         <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-80 overflow-y-auto">
           {/* 历史地址部分 */}
-          {suggestions.filter(s => s.source === 'history').length > 0 && (
-            <div className="px-3 py-2 bg-gray-50 border-b">
-              <div className="flex items-center text-xs text-gray-500">
-                <Clock className="w-3 h-3 mr-1" />
-                历史地址
+          {groupedSuggestions.history.length > 0 && (
+            <>
+              <div className="px-3 py-2 bg-gray-50 border-b">
+                <div className="flex items-center text-xs text-gray-500">
+                  <Clock className="w-3 h-3 mr-1" />
+                  历史地址
+                </div>
               </div>
-            </div>
+              {groupedSuggestions.history.map((addr, index) => (
+                <button
+                  key={`history-${index}`}
+                  onClick={() => handleSelectAddress(addr)}
+                  className="w-full px-3 py-2 text-left hover:bg-primary-50 flex items-start gap-2 border-b border-gray-100"
+                >
+                  {getIcon(addr)}
+                  <div className="flex-1 min-w-0">
+                    <div className="text-sm font-medium text-gray-900 truncate">{addr.label}</div>
+                    {addr.label !== addr.address && (
+                      <div className="text-xs text-gray-500 truncate">{addr.address}</div>
+                    )}
+                  </div>
+                </button>
+              ))}
+            </>
           )}
-          {suggestions.filter(s => s.source === 'history').map((addr, index) => (
-            <button
-              key={`history-${index}`}
-              onClick={() => handleSelectAddress(addr)}
-              className="w-full px-3 py-2 text-left hover:bg-primary-50 flex items-start gap-2 border-b border-gray-100"
-            >
-              <Clock className="w-4 h-4 text-gray-400 mt-0.5 flex-shrink-0" />
-              <div>
-                <div className="text-sm font-medium text-gray-900">{addr.label}</div>
-                {addr.label !== addr.address && (
-                  <div className="text-xs text-gray-500">{addr.address}</div>
-                )}
-                {addr.city && (
-                  <div className="text-xs text-gray-400">{addr.city}, {addr.country}</div>
-                )}
+
+          {/* 港口部分 */}
+          {groupedSuggestions.ports.length > 0 && (
+            <>
+              <div className="px-3 py-2 bg-blue-50 border-b">
+                <div className="flex items-center text-xs text-blue-600">
+                  <Anchor className="w-3 h-3 mr-1" />
+                  港口
+                </div>
               </div>
-            </button>
-          ))}
+              {groupedSuggestions.ports.map((addr, index) => (
+                <button
+                  key={`port-${index}`}
+                  onClick={() => handleSelectAddress(addr)}
+                  className="w-full px-3 py-2 text-left hover:bg-blue-50 flex items-start gap-2 border-b border-gray-100"
+                >
+                  {getIcon(addr)}
+                  <div className="flex-1 min-w-0">
+                    <div className="text-sm font-medium text-gray-900 truncate">
+                      {addr.label}
+                      {addr.code && <span className="ml-1 text-xs text-blue-500">({addr.code})</span>}
+                    </div>
+                    {addr.country && (
+                      <div className="text-xs text-gray-400">{addr.country}</div>
+                    )}
+                  </div>
+                </button>
+              ))}
+            </>
+          )}
+
+          {/* 城市部分 */}
+          {groupedSuggestions.cities.length > 0 && (
+            <>
+              <div className="px-3 py-2 bg-green-50 border-b">
+                <div className="flex items-center text-xs text-green-600">
+                  <Building2 className="w-3 h-3 mr-1" />
+                  城市
+                </div>
+              </div>
+              {groupedSuggestions.cities.map((addr, index) => (
+                <button
+                  key={`city-${index}`}
+                  onClick={() => handleSelectAddress(addr)}
+                  className="w-full px-3 py-2 text-left hover:bg-green-50 flex items-start gap-2 border-b border-gray-100"
+                >
+                  {getIcon(addr)}
+                  <div className="flex-1 min-w-0">
+                    <div className="text-sm font-medium text-gray-900 truncate">{addr.label}</div>
+                    {addr.countryCode && (
+                      <div className="text-xs text-gray-400">{addr.countryCode}</div>
+                    )}
+                  </div>
+                </button>
+              ))}
+            </>
+          )}
 
           {/* HERE API 搜索结果 */}
-          {suggestions.filter(s => s.source === 'here').length > 0 && (
-            <div className="px-3 py-2 bg-gray-50 border-b">
-              <div className="flex items-center text-xs text-gray-500">
-                <Search className="w-3 h-3 mr-1" />
-                搜索结果
+          {groupedSuggestions.here.length > 0 && (
+            <>
+              <div className="px-3 py-2 bg-gray-50 border-b">
+                <div className="flex items-center text-xs text-gray-500">
+                  <Search className="w-3 h-3 mr-1" />
+                  搜索结果
+                </div>
               </div>
-            </div>
+              {groupedSuggestions.here.map((addr, index) => (
+                <button
+                  key={`here-${index}`}
+                  onClick={() => handleSelectAddress(addr)}
+                  className="w-full px-3 py-2 text-left hover:bg-primary-50 flex items-start gap-2 border-b border-gray-100"
+                >
+                  {getIcon(addr)}
+                  <div className="flex-1 min-w-0">
+                    <div className="text-sm font-medium text-gray-900 truncate">{addr.label}</div>
+                    {addr.city && (
+                      <div className="text-xs text-gray-400">{addr.city}, {addr.country}</div>
+                    )}
+                  </div>
+                </button>
+              ))}
+            </>
           )}
-          {suggestions.filter(s => s.source === 'here').map((addr, index) => (
-            <button
-              key={`here-${index}`}
-              onClick={() => handleSelectAddress(addr)}
-              className="w-full px-3 py-2 text-left hover:bg-primary-50 flex items-start gap-2 border-b border-gray-100"
-            >
-              <MapPin className="w-4 h-4 text-primary-500 mt-0.5 flex-shrink-0" />
-              <div>
-                <div className="text-sm font-medium text-gray-900">{addr.label}</div>
-                {addr.city && (
-                  <div className="text-xs text-gray-400">{addr.city}, {addr.country}</div>
-                )}
-              </div>
-            </button>
-          ))}
 
           {/* 添加新地址 */}
           {showNewAddressHint && searchQuery.length > 5 && (
@@ -282,36 +423,8 @@ export default function AddressAutocomplete({
               </div>
             </button>
           )}
-
-          {/* 空状态：显示历史地址 */}
-          {suggestions.length === 0 && !showNewAddressHint && historyAddresses.length > 0 && !searchQuery && (
-            <>
-              <div className="px-3 py-2 bg-gray-50 border-b">
-                <div className="flex items-center text-xs text-gray-500">
-                  <Clock className="w-3 h-3 mr-1" />
-                  最近使用
-                </div>
-              </div>
-              {historyAddresses.slice(0, 5).map((addr, index) => (
-                <button
-                  key={`recent-${index}`}
-                  onClick={() => handleSelectAddress(addr)}
-                  className="w-full px-3 py-2 text-left hover:bg-primary-50 flex items-start gap-2 border-b border-gray-100"
-                >
-                  <Clock className="w-4 h-4 text-gray-400 mt-0.5 flex-shrink-0" />
-                  <div>
-                    <div className="text-sm font-medium text-gray-900">{addr.label}</div>
-                    {addr.label !== addr.address && (
-                      <div className="text-xs text-gray-500">{addr.address}</div>
-                    )}
-                  </div>
-                </button>
-              ))}
-            </>
-          )}
         </div>
       )}
     </div>
   )
 }
-

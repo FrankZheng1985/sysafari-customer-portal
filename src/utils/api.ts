@@ -184,6 +184,31 @@ export const portalApi = {
   searchAddresses: (params: { query: string; limit?: number }) => api.get('/addresses/search', { params }),
   saveNewAddress: (data: { address: string; label?: string; city?: string; country?: string; postalCode?: string; latitude?: number; longitude?: number }) => api.post('/addresses', data),
   
+  // ==================== 基础数据（从主系统获取）====================
+  // 起运港
+  getPortsOfLoading: (params?: { country?: string; search?: string }) => 
+    mainApi.get('/base-data/ports-of-loading', { params }),
+  
+  // 目的港
+  getDestinationPorts: (params?: { country?: string; search?: string }) => 
+    mainApi.get('/base-data/destination-ports', { params }),
+  
+  // 机场
+  getAirPorts: (params?: { country?: string; search?: string }) => 
+    mainApi.get('/base-data/air-ports', { params }),
+  
+  // 国家
+  getCountries: (params?: { region?: string; search?: string }) => 
+    mainApi.get('/base-data/countries', { params }),
+  
+  // 城市
+  getCities: (params?: { countryCode?: string; search?: string; level?: number }) => 
+    mainApi.get('/base-data/cities', { params }),
+  
+  // 常用位置（汇总）
+  getLocations: (params?: { type?: 'origin' | 'destination' | 'all'; search?: string }) => 
+    mainApi.get('/base-data/locations', { params }),
+  
   // 创建订单
   createOrder: (data: any) => mainApi.post('/orders', data),
   
