@@ -60,18 +60,26 @@ router.post('/login', async (req, res) => {
       if (erpResponse.data.errCode === 200) {
         // ERP 返回的是 data.user 和 data.token
         const erpUser = erpResponse.data.data.user
-        const erpToken = erpResponse.data.data.token  // 使用 ERP 返回的原始 Token
         console.log('ERP 用户信息:', JSON.stringify(erpUser))
         
-        // 直接使用 ERP 返回的 Token，这样后续调用 ERP API 时能通过验证
-        console.log('使用 ERP 原始 Token')
+        // 生成 Portal 自己的 Token，包含所有必要的客户信息
+        const portalToken = generateToken({
+          accountId: erpUser.id,
+          customerId: erpUser.customerId,
+          username: erpUser.username,
+          email: erpUser.email || loginId,
+          companyName: erpUser.customerName,
+          contactPerson: erpUser.username,
+          phone: erpUser.phone
+        })
         
+        console.log('已生成 Portal Token')
         console.log('登录成功，返回响应')
         return res.json({
           errCode: 200,
           msg: '登录成功',
           data: {
-            token: erpToken,  // 使用 ERP 的 Token
+            token: portalToken,  // 使用 Portal 自己的 Token
             customer: {
               id: erpUser.id,
               customerId: erpUser.customerId,
