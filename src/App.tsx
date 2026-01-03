@@ -35,7 +35,7 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 function App() {
   return (
     <AuthProvider>
-      <Router future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+      <Router>
         <Routes>
           {/* 公开路由 */}
           <Route path="/login" element={<Login />} />

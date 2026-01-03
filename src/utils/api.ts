@@ -88,13 +88,13 @@ export { mainApi }
 
 // API 辅助函数
 export const portalApi = {
-  // ==================== 认证相关（使用主系统 Portal API）====================
+  // ==================== 认证相关（使用本地门户后端 API）====================
   login: (username: string, password: string) => 
-    mainApi.post('/auth/login', { username, password }),
+    api.post('/auth/login', { username, password }),
   logout: () => api.post('/auth/logout'),
-  getCurrentUser: () => mainApi.get('/auth/me'),
+  getCurrentUser: () => api.get('/auth/me'),
   changePassword: (oldPassword: string, newPassword: string) => 
-    mainApi.post('/auth/change-password', { oldPassword, newPassword }),
+    api.post('/auth/change-password', { oldPassword, newPassword }),
   
   // ==================== 订单相关（从主系统获取）====================
   getOrders: (params?: {
