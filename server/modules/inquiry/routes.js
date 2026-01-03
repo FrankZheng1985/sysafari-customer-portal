@@ -886,6 +886,10 @@ router.get('/inquiries', authenticate, async (req, res) => {
     const { page = 1, pageSize = 20, status } = req.query
     const offset = (parseInt(page) - 1) * parseInt(pageSize)
     
+    console.log('========== 获取询价列表 ==========')
+    console.log('req.customer:', JSON.stringify(req.customer))
+    console.log('customerId:', customerId)
+    
     let whereClause = 'WHERE customer_id = $1'
     const conditions = [customerId]
     let paramIndex = 2
@@ -899,6 +903,9 @@ router.get('/inquiries', authenticate, async (req, res) => {
     const countResult = await db.prepare(`
       SELECT COUNT(*) as total FROM customer_inquiries ${whereClause}
     `).get(...conditions)
+    
+    console.log('查询条件:', whereClause, conditions)
+    console.log('查询结果 count:', countResult)
     
     // 获取询价列表
     const inquiriesRaw = await db.prepare(`
