@@ -65,7 +65,7 @@ export default function TariffCalculator() {
   const [searching, setSearching] = useState(false)
   const [showDropdown, setShowDropdown] = useState(false)
   const searchRef = useRef<HTMLDivElement>(null)
-  const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   
   // 进口国家的增值税率
   const [countryVatRate, setCountryVatRate] = useState<CountryVatRate | null>(null)
