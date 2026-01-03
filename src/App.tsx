@@ -9,6 +9,7 @@ import NewOrder from './pages/NewOrder'
 import Invoices from './pages/Invoices'
 import Payables from './pages/Payables'
 import Quote from './pages/Quote'
+import TariffCalculator from './pages/TariffCalculator'
 import ApiDocs from './pages/ApiDocs'
 import Settings from './pages/Settings'
 
@@ -34,7 +35,7 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 function App() {
   return (
     <AuthProvider>
-      <Router>
+      <Router future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
         <Routes>
           {/* 公开路由 */}
           <Route path="/login" element={<Login />} />
@@ -50,6 +51,7 @@ function App() {
             <Route path="orders/:id" element={<OrderDetail />} />
             <Route path="orders/new" element={<NewOrder />} />
             <Route path="quote" element={<Quote />} />
+            <Route path="tariff-calculator" element={<TariffCalculator />} />
             <Route path="invoices" element={<Invoices />} />
             <Route path="payables" element={<Payables />} />
             <Route path="api-docs" element={<ApiDocs />} />

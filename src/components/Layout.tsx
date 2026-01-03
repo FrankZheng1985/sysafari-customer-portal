@@ -22,6 +22,7 @@ const navigation = [
   { name: '仪表盘', href: '/', icon: LayoutDashboard },
   { name: '订单管理', href: '/orders', icon: Package },
   { name: '在线询价', href: '/quote', icon: Calculator },
+  { name: '关税计算', href: '/tariff-calculator', icon: Calculator },
   { name: '账单查询', href: '/invoices', icon: FileText },
   { name: '应付账款', href: '/payables', icon: CreditCard },
   { name: 'API 文档', href: '/api-docs', icon: Book },
