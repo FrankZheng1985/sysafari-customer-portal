@@ -921,6 +921,18 @@ router.get('/inquiries', authenticate, async (req, res) => {
       LIMIT $${paramIndex++} OFFSET $${paramIndex}
     `).all(...conditions, parseInt(pageSize), offset)
     
+    // 辅助函数：安全解析 JSON（处理 JSONB 已自动解析的情况）
+    const safeParseJson = (data) => {
+      if (!data) return null
+      if (typeof data === 'object') return data // JSONB 已自动解析
+      try {
+        return JSON.parse(data)
+      } catch (e) {
+        console.error('JSON 解析失败:', e.message, data)
+        return null
+      }
+    }
+    
     const inquiries = (inquiriesRaw || []).map(inq => ({
       id: inq.id,
       inquiryNumber: inq.inquiry_number,
@@ -928,8 +940,8 @@ router.get('/inquiries', authenticate, async (req, res) => {
       customerName: inq.customer_name,
       inquiryType: inq.inquiry_type,
       status: inq.status,
-      clearanceData: inq.clearance_data ? JSON.parse(inq.clearance_data) : null,
-      transportData: inq.transport_data ? JSON.parse(inq.transport_data) : null,
+      clearanceData: safeParseJson(inq.clearance_data),
+      transportData: safeParseJson(inq.transport_data),
       estimatedDuty: parseFloat(inq.estimated_duty || 0),
       estimatedVat: parseFloat(inq.estimated_vat || 0),
       clearanceFee: parseFloat(inq.clearance_fee || 0),
