@@ -6,8 +6,21 @@
 import { Router } from 'express'
 import { getDatabase } from '../../config/database.js'
 import { authenticate, logActivity } from '../../middleware/auth.js'
+import { v4 as uuidv4 } from 'uuid'
 
 const router = Router()
+
+/**
+ * 生成订单号
+ */
+function generateOrderNumber() {
+  const now = new Date()
+  const year = now.getFullYear().toString().slice(-2)
+  const month = String(now.getMonth() + 1).padStart(2, '0')
+  const day = String(now.getDate()).padStart(2, '0')
+  const random = Math.floor(Math.random() * 10000).toString().padStart(4, '0')
+  return `BP${year}${month}${day}${random}`
+}
 
 /**
  * 生成订单进度步骤
@@ -443,6 +456,189 @@ router.get('/:id/tracking', authenticate, async (req, res) => {
     res.status(500).json({
       errCode: 500,
       msg: '获取跟踪信息失败',
+      data: null
+    })
+  }
+})
+
+/**
+ * 创建订单/提单
+ * POST /api/orders
+ * 客户提交订单请求，等待 ERP 审核处理
+ */
+router.post('/', authenticate, async (req, res) => {
+  try {
+    const db = getDatabase()
+    const customerId = req.customer.customerId
+    const customerCode = req.customer.customerCode
+    const customerName = req.customer.customerName || req.customer.companyName
+    
+    const {
+      // 基本信息
+      transportMode,          // 运输方式: sea, air, rail, truck
+      externalOrderNo,        // 外部订单号
+      billNumber,             // 提单号
+      shippingLine,           // 船公司
+      containerNumber,        // 集装箱号
+      containerType,          // 柜型
+      sealNumber,             // 封号
+      // 航程信息
+      vesselVoyage,           // 船名航次
+      terminal,               // 码头
+      // 港口信息
+      portOfLoading,          // 起运港
+      portOfDischarge,        // 目的港
+      etd,                    // ETD
+      eta,                    // ETA
+      // 发货信息
+      shipper,                // 发货人
+      // 收货信息
+      consignee,              // 收货人
+      placeOfDelivery,        // 送货地址
+      // 货物信息
+      pieces,                 // 件数
+      weight,                 // 重量
+      volume,                 // 体积
+      cargoItems,             // 货物明细
+      // 其他
+      serviceType,            // 服务类型
+      remark                  // 备注
+    } = req.body
+    
+    // 验证必填字段
+    if (!shipper && !consignee) {
+      return res.status(400).json({
+        errCode: 400,
+        msg: '发货人或收货人至少填写一个',
+        data: null
+      })
+    }
+    
+    // 生成订单号
+    const orderNumber = generateOrderNumber()
+    const orderId = uuidv4()
+    
+    // 运输方式映射
+    const transportMethodMap = {
+      'sea': '海运',
+      'air': '空运',
+      'rail': '铁路',
+      'truck': '卡车'
+    }
+    
+    // 解析船名航次为 vessel 和 voyage
+    let vessel = ''
+    let voyage = ''
+    if (vesselVoyage) {
+      const parts = vesselVoyage.split(/[\/\s]+/)
+      if (parts.length >= 2) {
+        vessel = parts.slice(0, -1).join(' ')
+        voyage = parts[parts.length - 1]
+      } else {
+        vessel = vesselVoyage
+      }
+    }
+    
+    // 构建货物描述
+    let description = ''
+    if (cargoItems && cargoItems.length > 0) {
+      description = cargoItems
+        .filter(item => item.productName || item.productNameEn)
+        .map(item => `${item.productName || ''} ${item.productNameEn || ''} (${item.quantity || 0} ${item.unit || 'PCS'})`)
+        .join('; ')
+    }
+    
+    // 插入订单到数据库
+    await db.prepare(`
+      INSERT INTO bills_of_lading (
+        id, order_number, bill_number, external_order_no,
+        customer_id, customer_code, customer_name,
+        transport_method, shipping_line, container_number, container_type, seal_number,
+        vessel, voyage, terminal,
+        port_of_loading, port_of_discharge, place_of_delivery,
+        etd, eta,
+        shipper, consignee,
+        pieces, weight, volume,
+        description, remark, service_type,
+        status, ship_status, customs_status, delivery_status,
+        source, created_at, updated_at
+      ) VALUES (
+        $1, $2, $3, $4,
+        $5, $6, $7,
+        $8, $9, $10, $11, $12,
+        $13, $14, $15,
+        $16, $17, $18,
+        $19, $20,
+        $21, $22,
+        $23, $24, $25,
+        $26, $27, $28,
+        $29, $30, $31, $32,
+        $33, NOW(), NOW()
+      )
+    `).run(
+      orderId, orderNumber, billNumber || null, externalOrderNo || null,
+      customerId, customerCode, customerName,
+      transportMethodMap[transportMode] || '海运', shippingLine || null, containerNumber || null, containerType || null, sealNumber || null,
+      vessel || null, voyage || null, terminal || null,
+      portOfLoading || null, portOfDischarge || null, placeOfDelivery || null,
+      etd || null, eta || null,
+      shipper || null, consignee || null,
+      pieces || null, weight || null, volume || null,
+      description || null, remark || null, serviceType || 'door-to-door',
+      '待处理', '未到港', null, null,
+      'customer_portal'  // 标记来源为客户门户
+    )
+    
+    // 如果有货物明细，保存到 cargo_items 表（如果存在）
+    if (cargoItems && cargoItems.length > 0) {
+      try {
+        for (const item of cargoItems) {
+          if (item.productName || item.productNameEn) {
+            await db.prepare(`
+              INSERT INTO cargo_items (
+                id, bill_id, product_name, product_name_en, hs_code,
+                quantity, unit, unit_price, created_at
+              ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW())
+            `).run(
+              uuidv4(), orderId, item.productName || null, item.productNameEn || null, item.hsCode || null,
+              item.quantity || 0, item.unit || 'PCS', item.unitPrice || 0
+            )
+          }
+        }
+      } catch (cargoError) {
+        // cargo_items 表可能不存在，忽略错误
+        console.log('货物明细保存跳过（表可能不存在）:', cargoError.message)
+      }
+    }
+    
+    // 记录活动
+    await logActivity({
+      customerId: req.customer.id,
+      action: 'create_order',
+      resourceType: 'order',
+      resourceId: orderId,
+      details: { orderNumber, billNumber }
+    })
+    
+    console.log(`客户门户订单创建成功: ${orderNumber} (客户: ${customerName})`)
+    
+    res.json({
+      errCode: 200,
+      msg: '订单创建成功',
+      data: {
+        id: orderId,
+        orderNumber,
+        billNumber,
+        status: '待处理'
+      }
+    })
+    
+  } catch (error) {
+    console.error('创建订单失败:', error.message)
+    
+    res.status(500).json({
+      errCode: 500,
+      msg: '创建订单失败: ' + error.message,
       data: null
     })
   }

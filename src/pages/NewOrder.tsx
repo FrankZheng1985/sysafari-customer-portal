@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { portalApi } from '../utils/api'
-import { ArrowLeft, Plus, Trash2, AlertCircle, CheckCircle } from 'lucide-react'
+import { ArrowLeft, Plus, Trash2, AlertCircle, CheckCircle, Ship, Plane, Truck } from 'lucide-react'
 
 interface CargoItem {
   productName: string
@@ -12,6 +12,21 @@ interface CargoItem {
   unitPrice: number
 }
 
+// 运输方式选项
+const transportModes = [
+  { value: 'sea', label: '海运', icon: Ship },
+  { value: 'air', label: '空运', icon: Plane },
+  { value: 'rail', label: '铁路', icon: Truck },
+  { value: 'truck', label: '卡车', icon: Truck },
+]
+
+// 常用船公司
+const shippingLines = [
+  'COSCO', 'MSC', 'MAERSK', 'CMA CGM', 'ONE', 'Evergreen', 
+  'Hapag-Lloyd', 'Yang Ming', 'HMM', 'ZIM', 'PIL', 'OOCL',
+  'Wan Hai', 'SITC', 'Other'
+]
+
 export default function NewOrder() {
   const navigate = useNavigate()
   const [loading, setLoading] = useState(false)
@@ -19,20 +34,31 @@ export default function NewOrder() {
   const [error, setError] = useState('')
   
   const [formData, setFormData] = useState({
-    externalOrderNo: '',
-    billNumber: '',
-    containerNumber: '',
+    // 基本信息
+    transportMode: 'sea',          // 运输方式
+    externalOrderNo: '',           // 外部订单号
+    billNumber: '',                // 提单号
+    shippingLine: '',              // 船公司
+    containerNumber: '',           // 集装箱号
+    containerType: '',             // 柜型
+    sealNumber: '',                // 封号
+    // 航程信息
+    vesselVoyage: '',              // 航班号/船名航次
+    terminal: '',                  // 地勤（码头）
+    // 发货信息
     shipper: '',
-    consignee: '',
     portOfLoading: '',
+    etd: '',
+    // 收货信息
+    consignee: '',
     portOfDischarge: '',
     placeOfDelivery: '',
-    etd: '',
     eta: '',
+    // 货物信息
     pieces: '',
     weight: '',
     volume: '',
-    containerType: '',
+    // 其他
     serviceType: 'door-to-door',
     remark: ''
   })
@@ -142,6 +168,41 @@ export default function NewOrder() {
       )}
 
       <form onSubmit={handleSubmit} className="space-y-6">
+        {/* 运输方式 */}
+        <div className="card p-6">
+          <h2 className="text-lg font-semibold text-gray-900 mb-4">运输方式 <span className="text-red-500">*</span></h2>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            {transportModes.map((mode) => {
+              const Icon = mode.icon
+              return (
+                <label
+                  key={mode.value}
+                  className={`relative flex flex-col items-center p-4 border-2 rounded-lg cursor-pointer transition-all ${
+                    formData.transportMode === mode.value
+                      ? 'border-primary-500 bg-primary-50'
+                      : 'border-gray-200 hover:border-gray-300'
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    name="transportMode"
+                    value={mode.value}
+                    checked={formData.transportMode === mode.value}
+                    onChange={handleChange}
+                    className="sr-only"
+                  />
+                  <Icon className={`w-6 h-6 mb-2 ${
+                    formData.transportMode === mode.value ? 'text-primary-600' : 'text-gray-400'
+                  }`} />
+                  <span className={`text-sm font-medium ${
+                    formData.transportMode === mode.value ? 'text-primary-700' : 'text-gray-600'
+                  }`}>{mode.label}</span>
+                </label>
+              )
+            })}
+          </div>
+        </div>
+
         {/* 基本信息 */}
         <div className="card p-6">
           <h2 className="text-lg font-semibold text-gray-900 mb-4">基本信息</h2>
@@ -161,7 +222,7 @@ export default function NewOrder() {
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                提单号
+                提单号 <span className="text-red-500">*</span>
               </label>
               <input
                 type="text"
@@ -169,19 +230,24 @@ export default function NewOrder() {
                 value={formData.billNumber}
                 onChange={handleChange}
                 className="input"
+                placeholder="输入完整提单号"
               />
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                集装箱号
+                船公司
               </label>
-              <input
-                type="text"
-                name="containerNumber"
-                value={formData.containerNumber}
+              <select
+                name="shippingLine"
+                value={formData.shippingLine}
                 onChange={handleChange}
                 className="input"
-              />
+              >
+                <option value="">选择或输入船公司</option>
+                {shippingLines.map(line => (
+                  <option key={line} value={line}>{line}</option>
+                ))}
+              </select>
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -198,30 +264,83 @@ export default function NewOrder() {
                 <option value="40GP">40GP</option>
                 <option value="40HQ">40HQ</option>
                 <option value="45HQ">45HQ</option>
+                <option value="20RF">20RF (冷藏)</option>
+                <option value="40RF">40RF (冷藏)</option>
+                <option value="20OT">20OT (开顶)</option>
+                <option value="40OT">40OT (开顶)</option>
+                <option value="20FR">20FR (框架)</option>
+                <option value="40FR">40FR (框架)</option>
               </select>
             </div>
-          </div>
-        </div>
-
-        {/* 发货信息 */}
-        <div className="card p-6">
-          <h2 className="text-lg font-semibold text-gray-900 mb-4">发货信息</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="md:col-span-2">
+            <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                发货人 *
+                集装箱号
               </label>
               <input
                 type="text"
-                name="shipper"
-                value={formData.shipper}
+                name="containerNumber"
+                value={formData.containerNumber}
                 onChange={handleChange}
                 className="input"
+                placeholder="如 COSU1234567"
               />
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                起运港
+                封号
+              </label>
+              <input
+                type="text"
+                name="sealNumber"
+                value={formData.sealNumber}
+                onChange={handleChange}
+                className="input"
+                placeholder="铅封号"
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* 航程信息 */}
+        <div className="card p-6">
+          <h2 className="text-lg font-semibold text-gray-900 mb-4">航程信息</h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                {formData.transportMode === 'air' ? '航班号' : '船名航次'} <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="text"
+                name="vesselVoyage"
+                value={formData.vesselVoyage}
+                onChange={handleChange}
+                className="input"
+                placeholder={formData.transportMode === 'air' ? '如 CA123' : '如 EVER GIVEN / 025W'}
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                地勤（码头）
+              </label>
+              <input
+                type="text"
+                name="terminal"
+                value={formData.terminal}
+                onChange={handleChange}
+                className="input"
+                placeholder="集装箱落在哪个码头"
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* 港口信息 */}
+        <div className="card p-6">
+          <h2 className="text-lg font-semibold text-gray-900 mb-4">港口信息</h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                起运港 <span className="text-red-500">*</span>
               </label>
               <input
                 type="text"
@@ -229,12 +348,25 @@ export default function NewOrder() {
                 value={formData.portOfLoading}
                 onChange={handleChange}
                 className="input"
-                placeholder="如：CNSHA"
+                placeholder="搜索或选择起运港"
               />
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                ETD
+                目的港 <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="text"
+                name="portOfDischarge"
+                value={formData.portOfDischarge}
+                onChange={handleChange}
+                className="input"
+                placeholder="搜索或选择目的港"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                ETD (预计离港)
               </label>
               <input
                 type="date"
@@ -244,41 +376,9 @@ export default function NewOrder() {
                 className="input"
               />
             </div>
-          </div>
-        </div>
-
-        {/* 收货信息 */}
-        <div className="card p-6">
-          <h2 className="text-lg font-semibold text-gray-900 mb-4">收货信息</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="md:col-span-2">
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                收货人 *
-              </label>
-              <input
-                type="text"
-                name="consignee"
-                value={formData.consignee}
-                onChange={handleChange}
-                className="input"
-              />
-            </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                目的港
-              </label>
-              <input
-                type="text"
-                name="portOfDischarge"
-                value={formData.portOfDischarge}
-                onChange={handleChange}
-                className="input"
-                placeholder="如：DEHAM"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                ETA
+                ETA (预计到港)
               </label>
               <input
                 type="date"
@@ -288,7 +388,47 @@ export default function NewOrder() {
                 className="input"
               />
             </div>
-            <div className="md:col-span-2">
+          </div>
+        </div>
+
+        {/* 发货信息 */}
+        <div className="card p-6">
+          <h2 className="text-lg font-semibold text-gray-900 mb-4">发货信息</h2>
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                发货人 <span className="text-red-500">*</span>
+              </label>
+              <textarea
+                name="shipper"
+                value={formData.shipper}
+                onChange={handleChange}
+                rows={3}
+                className="input"
+                placeholder="发货人名称、地址、联系方式"
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* 收货信息 */}
+        <div className="card p-6">
+          <h2 className="text-lg font-semibold text-gray-900 mb-4">收货信息</h2>
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                收货人 <span className="text-red-500">*</span>
+              </label>
+              <textarea
+                name="consignee"
+                value={formData.consignee}
+                onChange={handleChange}
+                rows={3}
+                className="input"
+                placeholder="收货人名称、地址、联系方式"
+              />
+            </div>
+            <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 送货地址
               </label>
@@ -298,6 +438,7 @@ export default function NewOrder() {
                 value={formData.placeOfDelivery}
                 onChange={handleChange}
                 className="input"
+                placeholder="最终送货地址（如与收货人不同）"
               />
             </div>
           </div>

@@ -220,8 +220,8 @@ export const portalApi = {
   getLocations: (params?: { type?: 'origin' | 'destination' | 'all'; search?: string }) => 
     mainApi.get('/base-data/locations', { params }),
   
-  // 创建订单
-  createOrder: (data: any) => mainApi.post('/orders', data),
+  // 创建订单（使用门户后端 API）
+  createOrder: (data: any) => api.post('/orders', data),
   
   // 下载 Excel（账单页面使用）
   downloadInvoiceExcel: (id: string) => 

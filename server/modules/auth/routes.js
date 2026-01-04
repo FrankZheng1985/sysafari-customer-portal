@@ -127,7 +127,7 @@ router.post('/login', async (req, res) => {
     console.log('密码验证成功')
     
     // 登录成功，重置登录失败次数，更新登录信息
-    await db.prepare(`
+        await db.prepare(`
       UPDATE customer_accounts 
       SET login_attempts = 0, 
           locked_until = NULL, 
