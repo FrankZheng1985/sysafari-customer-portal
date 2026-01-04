@@ -52,7 +52,7 @@ router.post('/login', async (req, res) => {
         ca.login_attempts,
         ca.locked_until,
         ca.last_login_at,
-        c.code AS customer_code,
+        c.customer_code,
         c.customer_name,
         c.company_name,
         c.contact_person
@@ -202,7 +202,7 @@ router.get('/me', authenticate, async (req, res) => {
         ca.email,
         ca.phone,
         ca.status,
-        c.code AS customer_code,
+        c.customer_code,
         c.customer_name,
         c.company_name,
         c.contact_person
