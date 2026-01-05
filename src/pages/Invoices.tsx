@@ -229,10 +229,17 @@ export default function Invoices() {
                         {invoice.currency} {invoice.balance?.toLocaleString() || '0'}
                       </td>
                       <td>
-                        <div className="flex items-center justify-center">
+                        <div className="flex flex-col items-center gap-1">
                           <span className={`status-badge ${getStatusColor(invoice.status)}`}>
                             {getStatusText(invoice.status)}
                           </span>
+                          {/* 文件状态标注 */}
+                          {!invoice.pdfUrl && !invoice.excelUrl && (
+                            <span className="text-xs text-orange-500 flex items-center gap-1">
+                              <AlertCircle className="w-3 h-3" />
+                              待出账
+                            </span>
+                          )}
                         </div>
                       </td>
                       <td>
@@ -244,26 +251,32 @@ export default function Invoices() {
                           >
                             <Eye className="w-4 h-4" />
                           </button>
-                          <button
-                            onClick={() => handleDownloadPdf(invoice)}
-                            className={`p-1.5 hover:bg-gray-100 rounded ${
-                              invoice.pdfUrl ? 'text-gray-500 hover:text-red-600' : 'text-gray-300 cursor-not-allowed'
-                            }`}
-                            title={invoice.pdfUrl ? '下载PDF' : 'PDF未生成'}
-                            disabled={!invoice.pdfUrl}
-                          >
-                            <Download className="w-4 h-4" />
-                          </button>
-                          <button
-                            onClick={() => handleDownloadExcel(invoice)}
-                            className={`p-1.5 hover:bg-gray-100 rounded ${
-                              invoice.excelUrl ? 'text-gray-500 hover:text-green-600' : 'text-gray-300 cursor-not-allowed'
-                            }`}
-                            title={invoice.excelUrl ? '下载Excel' : 'Excel未生成'}
-                            disabled={!invoice.excelUrl}
-                          >
-                            <FileSpreadsheet className="w-4 h-4" />
-                          </button>
+                          {invoice.pdfUrl ? (
+                            <button
+                              onClick={() => handleDownloadPdf(invoice)}
+                              className="p-1.5 hover:bg-gray-100 rounded text-gray-500 hover:text-red-600"
+                              title="下载PDF发票"
+                            >
+                              <Download className="w-4 h-4" />
+                            </button>
+                          ) : (
+                            <span className="p-1.5 text-gray-300" title="PDF发票未生成">
+                              <Download className="w-4 h-4" />
+                            </span>
+                          )}
+                          {invoice.excelUrl ? (
+                            <button
+                              onClick={() => handleDownloadExcel(invoice)}
+                              className="p-1.5 hover:bg-gray-100 rounded text-gray-500 hover:text-green-600"
+                              title="下载Excel对账单"
+                            >
+                              <FileSpreadsheet className="w-4 h-4" />
+                            </button>
+                          ) : (
+                            <span className="p-1.5 text-gray-300" title="Excel对账单未生成">
+                              <FileSpreadsheet className="w-4 h-4" />
+                            </span>
+                          )}
                         </div>
                       </td>
                     </tr>
