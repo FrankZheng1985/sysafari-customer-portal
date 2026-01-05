@@ -42,6 +42,10 @@ jobs:
             echo "🔨 构建前端..."
             npm run build
             
+            # 复制构建文件到 Nginx 服务目录
+            echo "📂 部署前端文件到 Nginx..."
+            cp -r /var/www/sysafari-portal/dist/* /var/www/portal/
+            
             # 安装后端依赖
             echo "📦 安装后端依赖..."
             cd server
