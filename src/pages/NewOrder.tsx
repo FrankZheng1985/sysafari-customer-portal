@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { portalApi } from '../utils/api'
-import { ArrowLeft, Plus, Trash2, AlertCircle, CheckCircle, Ship, Plane, Truck, Calendar } from 'lucide-react'
+import { ArrowLeft, Plus, Trash2, AlertCircle, CheckCircle, Ship, Plane, Truck, Train, Calendar } from 'lucide-react'
 
 interface CargoItem {
   productName: string
@@ -16,7 +16,7 @@ interface CargoItem {
 const transportModes = [
   { value: 'sea', label: '海运', icon: Ship },
   { value: 'air', label: '空运', icon: Plane },
-  { value: 'rail', label: '铁路', icon: Truck },
+  { value: 'rail', label: '铁路', icon: Train },
   { value: 'truck', label: '卡车', icon: Truck },
 ]
 
