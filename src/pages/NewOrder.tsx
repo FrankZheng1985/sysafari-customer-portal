@@ -1,9 +1,10 @@
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { portalApi } from '../utils/api'
-import { ArrowLeft, Plus, Trash2, AlertCircle, CheckCircle, Ship, Plane, Truck, Train, Calendar } from 'lucide-react'
+import { ArrowLeft, Plus, Trash2, AlertCircle, CheckCircle, Ship, Plane, Truck, Train, Calendar, Upload, Download, FileSpreadsheet, X } from 'lucide-react'
 import PartySelector from '../components/PartySelector'
 import AddressAutocomplete from '../components/AddressAutocomplete'
+import * as XLSX from 'xlsx'
 
 interface CargoItem {
   productName: string
@@ -103,6 +104,134 @@ export default function NewOrder() {
   const removeCargoItem = (index: number) => {
     if (cargoItems.length > 1) {
       setCargoItems(prev => prev.filter((_, i) => i !== index))
+    }
+  }
+
+  // 文件上传相关
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  const [uploadError, setUploadError] = useState('')
+  const [importing, setImporting] = useState(false)
+
+  // 下载模板
+  const downloadTemplate = () => {
+    const templateData = [
+      {
+        '中文品名': '示例产品',
+        '英文品名': 'Sample Product',
+        'HS编码': '8471300000',
+        '数量': 100,
+        '单位': 'PCS',
+        '单价(USD)': 10.50
+      },
+      {
+        '中文品名': '电子配件',
+        '英文品名': 'Electronic Parts',
+        'HS编码': '8534000000',
+        '数量': 500,
+        '单位': 'PCS',
+        '单价(USD)': 2.30
+      }
+    ]
+    
+    const ws = XLSX.utils.json_to_sheet(templateData)
+    const wb = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(wb, ws, '货物明细')
+    
+    // 设置列宽
+    ws['!cols'] = [
+      { wch: 20 }, // 中文品名
+      { wch: 25 }, // 英文品名
+      { wch: 15 }, // HS编码
+      { wch: 10 }, // 数量
+      { wch: 8 },  // 单位
+      { wch: 12 }, // 单价
+    ]
+    
+    XLSX.writeFile(wb, '货物明细模板.xlsx')
+  }
+
+  // 处理文件上传
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    setUploadError('')
+    setImporting(true)
+
+    try {
+      const reader = new FileReader()
+      
+      reader.onload = (event) => {
+        try {
+          const data = event.target?.result
+          const workbook = XLSX.read(data, { type: 'binary' })
+          const sheetName = workbook.SheetNames[0]
+          const sheet = workbook.Sheets[sheetName]
+          const jsonData = XLSX.utils.sheet_to_json(sheet)
+
+          if (jsonData.length === 0) {
+            setUploadError('文件中没有数据')
+            setImporting(false)
+            return
+          }
+
+          // 解析数据并转换为 CargoItem 格式
+          const importedItems: CargoItem[] = jsonData.map((row: any) => ({
+            productName: row['中文品名'] || row['productName'] || row['品名'] || '',
+            productNameEn: row['英文品名'] || row['productNameEn'] || row['English Name'] || '',
+            hsCode: String(row['HS编码'] || row['hsCode'] || row['HS Code'] || ''),
+            quantity: parseInt(row['数量'] || row['quantity'] || row['Quantity'] || 0) || 0,
+            unit: row['单位'] || row['unit'] || row['Unit'] || 'PCS',
+            unitPrice: parseFloat(row['单价(USD)'] || row['单价'] || row['unitPrice'] || row['Unit Price'] || 0) || 0
+          }))
+
+          // 过滤掉完全空的行
+          const validItems = importedItems.filter(item => 
+            item.productName || item.productNameEn || item.hsCode
+          )
+
+          if (validItems.length === 0) {
+            setUploadError('未找到有效的货物数据，请检查文件格式')
+            setImporting(false)
+            return
+          }
+
+          // 替换现有的货物明细（如果只有一个空项）或追加
+          if (cargoItems.length === 1 && !cargoItems[0].productName && !cargoItems[0].productNameEn) {
+            setCargoItems(validItems)
+          } else {
+            setCargoItems(prev => [...prev, ...validItems])
+          }
+
+          setImporting(false)
+        } catch (err) {
+          console.error('解析文件错误:', err)
+          setUploadError('文件解析失败，请确保文件格式正确')
+          setImporting(false)
+        }
+      }
+
+      reader.onerror = () => {
+        setUploadError('文件读取失败')
+        setImporting(false)
+      }
+
+      reader.readAsBinaryString(file)
+    } catch (err) {
+      setUploadError('文件处理失败')
+      setImporting(false)
+    }
+
+    // 清空 input 以便可以重复上传同一文件
+    if (fileInputRef.current) {
+      fileInputRef.current.value = ''
+    }
+  }
+
+  // 清空所有货物明细
+  const clearAllCargoItems = () => {
+    if (confirm('确定要清空所有货物明细吗？')) {
+      setCargoItems([{ productName: '', productNameEn: '', hsCode: '', quantity: 0, unit: 'PCS', unitPrice: 0 }])
     }
   }
 
@@ -742,10 +871,101 @@ export default function NewOrder() {
             </div>
           </div>
 
-          <h3 className="text-sm font-medium text-gray-700 mb-3">货物明细</h3>
+          {/* 货物明细标题和操作按钮 */}
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="text-sm font-medium text-gray-700">货物明细</h3>
+            <div className="flex items-center gap-2">
+              {/* 下载模板 */}
+              <button
+                type="button"
+                onClick={downloadTemplate}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-gray-600 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 hover:border-gray-300 transition-colors"
+              >
+                <Download className="w-3.5 h-3.5" />
+                下载模板
+              </button>
+              
+              {/* 上传文件 */}
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".xlsx,.xls,.csv"
+                onChange={handleFileUpload}
+                className="hidden"
+              />
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={importing}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-primary-600 rounded-lg hover:bg-primary-700 transition-colors disabled:bg-gray-300"
+              >
+                {importing ? (
+                  <>
+                    <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    导入中...
+                  </>
+                ) : (
+                  <>
+                    <Upload className="w-3.5 h-3.5" />
+                    导入Excel
+                  </>
+                )}
+              </button>
+
+              {/* 清空按钮 - 只在有多条数据时显示 */}
+              {cargoItems.length > 1 && (
+                <button
+                  type="button"
+                  onClick={clearAllCargoItems}
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-red-600 bg-red-50 border border-red-200 rounded-lg hover:bg-red-100 transition-colors"
+                >
+                  <X className="w-3.5 h-3.5" />
+                  清空
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* 上传错误提示 */}
+          {uploadError && (
+            <div className="mb-3 p-3 bg-red-50 border border-red-200 rounded-lg flex items-center text-sm text-red-700">
+              <AlertCircle className="w-4 h-4 mr-2 flex-shrink-0" />
+              {uploadError}
+              <button
+                type="button"
+                onClick={() => setUploadError('')}
+                className="ml-auto text-red-500 hover:text-red-700"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          )}
+
+          {/* 导入统计 */}
+          {cargoItems.length > 1 && (
+            <div className="mb-3 p-3 bg-blue-50 border border-blue-200 rounded-lg flex items-center text-sm text-blue-700">
+              <FileSpreadsheet className="w-4 h-4 mr-2 flex-shrink-0" />
+              共 {cargoItems.filter(item => item.productName || item.productNameEn).length} 条货物记录
+              {cargoItems.some(item => item.quantity > 0) && (
+                <span className="ml-2">
+                  | 总数量: {cargoItems.reduce((sum, item) => sum + (item.quantity || 0), 0).toLocaleString()}
+                </span>
+              )}
+              {cargoItems.some(item => item.unitPrice > 0) && (
+                <span className="ml-2">
+                  | 总金额: ${cargoItems.reduce((sum, item) => sum + (item.quantity || 0) * (item.unitPrice || 0), 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </span>
+              )}
+            </div>
+          )}
+
+          {/* 货物明细列表 */}
           <div className="space-y-3">
             {cargoItems.map((item, index) => (
               <div key={index} className="flex items-start gap-2 p-3 bg-gray-50 rounded-lg">
+                <span className="w-6 h-6 flex items-center justify-center bg-gray-200 text-gray-600 text-xs rounded-full flex-shrink-0 mt-2">
+                  {index + 1}
+                </span>
                 <div className="grid grid-cols-2 md:grid-cols-5 gap-2 flex-1">
                   <input
                     type="text"
@@ -787,7 +1007,7 @@ export default function NewOrder() {
                 <button
                   type="button"
                   onClick={() => removeCargoItem(index)}
-                  className="p-2 text-gray-400 hover:text-red-500"
+                  className="p-2 text-gray-400 hover:text-red-500 transition-colors"
                   disabled={cargoItems.length === 1}
                 >
                   <Trash2 className="w-4 h-4" />
