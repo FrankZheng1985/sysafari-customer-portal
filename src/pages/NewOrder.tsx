@@ -7,12 +7,25 @@ import AddressAutocomplete from '../components/AddressAutocomplete'
 import * as XLSX from 'xlsx'
 
 interface CargoItem {
-  productName: string
-  productNameEn: string
-  hsCode: string
-  quantity: number
-  unit: string
-  unitPrice: number
+  no: number              // 序号
+  marks: string           // 唛头
+  productName: string     // 中文品名
+  productNameEn: string   // 英文品名
+  spec: string            // 型号/规格
+  hsCode: string          // HS编码
+  material: string        // 材质
+  usage: string           // 用途
+  brand: string           // 品牌
+  origin: string          // 原产国
+  quantity: number        // 数量
+  unit: string            // 单位
+  unitPrice: number       // 单价USD
+  totalPrice: number      // 总价USD
+  netWeight: number       // 净重KG
+  grossWeight: number     // 毛重KG
+  packages: number        // 件数
+  packingType: string     // 包装方式
+  volume: number          // 体积CBM
 }
 
 // 运输方式选项
@@ -78,7 +91,12 @@ export default function NewOrder() {
   })
   
   const [cargoItems, setCargoItems] = useState<CargoItem[]>([
-    { productName: '', productNameEn: '', hsCode: '', quantity: 0, unit: 'PCS', unitPrice: 0 }
+    { 
+      no: 1, marks: '', productName: '', productNameEn: '', spec: '', hsCode: '', 
+      material: '', usage: '', brand: '', origin: '', quantity: 0, unit: 'PCS', 
+      unitPrice: 0, totalPrice: 0, netWeight: 0, grossWeight: 0, packages: 0, 
+      packingType: '', volume: 0 
+    }
   ])
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
@@ -97,7 +115,12 @@ export default function NewOrder() {
   const addCargoItem = () => {
     setCargoItems(prev => [
       ...prev,
-      { productName: '', productNameEn: '', hsCode: '', quantity: 0, unit: 'PCS', unitPrice: 0 }
+      { 
+        no: prev.length + 1, marks: '', productName: '', productNameEn: '', spec: '', hsCode: '', 
+        material: '', usage: '', brand: '', origin: '', quantity: 0, unit: 'PCS', 
+        unitPrice: 0, totalPrice: 0, netWeight: 0, grossWeight: 0, packages: 0, 
+        packingType: '', volume: 0 
+      }
     ])
   }
 
@@ -116,20 +139,46 @@ export default function NewOrder() {
   const downloadTemplate = () => {
     const templateData = [
       {
-        '中文品名': '示例产品',
-        '英文品名': 'Sample Product',
+        '序号': 1,
+        '唛头': 'N/M',
+        '中文品名': '电子产品配件',
+        '英文品名': 'Electronic Parts',
+        '型号规格': 'Model A-100',
         'HS编码': '8471300000',
-        '数量': 100,
+        '材质': '塑料+金属',
+        '用途': '电子设备配件',
+        '品牌': 'OEM',
+        '原产国': 'China',
+        '数量': 1000,
         '单位': 'PCS',
-        '单价(USD)': 10.50
+        '单价USD': 2.50,
+        '总价USD': 2500.00,
+        '净重KG': 150.00,
+        '毛重KG': 180.00,
+        '件数': 10,
+        '包装方式': '纸箱',
+        '体积CBM': 2.5
       },
       {
-        '中文品名': '电子配件',
-        '英文品名': 'Electronic Parts',
-        'HS编码': '8534000000',
-        '数量': 500,
+        '序号': 2,
+        '唛头': 'N/M',
+        '中文品名': '塑料制品',
+        '英文品名': 'Plastic Products',
+        '型号规格': 'PP-200',
+        'HS编码': '3926909090',
+        '材质': 'PP塑料',
+        '用途': '日用品',
+        '品牌': 'Generic',
+        '原产国': 'China',
+        '数量': 5000,
         '单位': 'PCS',
-        '单价(USD)': 2.30
+        '单价USD': 0.50,
+        '总价USD': 2500.00,
+        '净重KG': 200.00,
+        '毛重KG': 250.00,
+        '件数': 20,
+        '包装方式': '纸箱',
+        '体积CBM': 4.0
       }
     ]
     
@@ -139,12 +188,25 @@ export default function NewOrder() {
     
     // 设置列宽
     ws['!cols'] = [
-      { wch: 20 }, // 中文品名
-      { wch: 25 }, // 英文品名
-      { wch: 15 }, // HS编码
-      { wch: 10 }, // 数量
-      { wch: 8 },  // 单位
-      { wch: 12 }, // 单价
+      { wch: 6 },   // 序号
+      { wch: 10 },  // 唛头
+      { wch: 18 },  // 中文品名
+      { wch: 22 },  // 英文品名
+      { wch: 15 },  // 型号规格
+      { wch: 12 },  // HS编码
+      { wch: 12 },  // 材质
+      { wch: 12 },  // 用途
+      { wch: 10 },  // 品牌
+      { wch: 10 },  // 原产国
+      { wch: 8 },   // 数量
+      { wch: 6 },   // 单位
+      { wch: 10 },  // 单价USD
+      { wch: 12 },  // 总价USD
+      { wch: 10 },  // 净重KG
+      { wch: 10 },  // 毛重KG
+      { wch: 6 },   // 件数
+      { wch: 10 },  // 包装方式
+      { wch: 10 },  // 体积CBM
     ]
     
     XLSX.writeFile(wb, '货物明细模板.xlsx')
@@ -176,13 +238,26 @@ export default function NewOrder() {
           }
 
           // 解析数据并转换为 CargoItem 格式
-          const importedItems: CargoItem[] = jsonData.map((row: any) => ({
+          const importedItems: CargoItem[] = jsonData.map((row: any, index: number) => ({
+            no: parseInt(row['序号'] || row['no'] || row['No'] || row['No.']) || (index + 1),
+            marks: row['唛头'] || row['marks'] || row['Marks'] || row['Marks & Numbers'] || '',
             productName: row['中文品名'] || row['productName'] || row['品名'] || '',
             productNameEn: row['英文品名'] || row['productNameEn'] || row['English Name'] || '',
-            hsCode: String(row['HS编码'] || row['hsCode'] || row['HS Code'] || ''),
-            quantity: parseInt(row['数量'] || row['quantity'] || row['Quantity'] || 0) || 0,
+            spec: row['型号规格'] || row['规格'] || row['型号'] || row['spec'] || row['Model'] || row['Specification'] || '',
+            hsCode: String(row['HS编码'] || row['hsCode'] || row['HS Code'] || row['HSCode'] || ''),
+            material: row['材质'] || row['material'] || row['Material'] || '',
+            usage: row['用途'] || row['usage'] || row['Usage'] || '',
+            brand: row['品牌'] || row['brand'] || row['Brand'] || '',
+            origin: row['原产国'] || row['origin'] || row['Origin'] || row['Country of Origin'] || '',
+            quantity: parseInt(row['数量'] || row['quantity'] || row['Quantity'] || row['Qty'] || 0) || 0,
             unit: row['单位'] || row['unit'] || row['Unit'] || 'PCS',
-            unitPrice: parseFloat(row['单价(USD)'] || row['单价'] || row['unitPrice'] || row['Unit Price'] || 0) || 0
+            unitPrice: parseFloat(row['单价USD'] || row['单价'] || row['unitPrice'] || row['Unit Price'] || 0) || 0,
+            totalPrice: parseFloat(row['总价USD'] || row['总价'] || row['totalPrice'] || row['Total Price'] || row['Amount'] || 0) || 0,
+            netWeight: parseFloat(row['净重KG'] || row['净重'] || row['netWeight'] || row['Net Weight'] || row['N.W.'] || 0) || 0,
+            grossWeight: parseFloat(row['毛重KG'] || row['毛重'] || row['grossWeight'] || row['Gross Weight'] || row['G.W.'] || 0) || 0,
+            packages: parseInt(row['件数'] || row['packages'] || row['Packages'] || row['CTNS'] || row['Cartons'] || 0) || 0,
+            packingType: row['包装方式'] || row['包装'] || row['packingType'] || row['Packing'] || '',
+            volume: parseFloat(row['体积CBM'] || row['体积'] || row['volume'] || row['Volume'] || row['CBM'] || 0) || 0
           }))
 
           // 过滤掉完全空的行
@@ -196,11 +271,16 @@ export default function NewOrder() {
             return
           }
 
+          // 重新编号
+          const renumberedItems = validItems.map((item, idx) => ({ ...item, no: idx + 1 }))
+          
           // 替换现有的货物明细（如果只有一个空项）或追加
           if (cargoItems.length === 1 && !cargoItems[0].productName && !cargoItems[0].productNameEn) {
-            setCargoItems(validItems)
+            setCargoItems(renumberedItems)
           } else {
-            setCargoItems(prev => [...prev, ...validItems])
+            const startNo = cargoItems.length
+            const appendItems = renumberedItems.map((item, idx) => ({ ...item, no: startNo + idx + 1 }))
+            setCargoItems(prev => [...prev, ...appendItems])
           }
 
           setImporting(false)
@@ -231,7 +311,12 @@ export default function NewOrder() {
   // 清空所有货物明细
   const clearAllCargoItems = () => {
     if (confirm('确定要清空所有货物明细吗？')) {
-      setCargoItems([{ productName: '', productNameEn: '', hsCode: '', quantity: 0, unit: 'PCS', unitPrice: 0 }])
+      setCargoItems([{ 
+        no: 1, marks: '', productName: '', productNameEn: '', spec: '', hsCode: '', 
+        material: '', usage: '', brand: '', origin: '', quantity: 0, unit: 'PCS', 
+        unitPrice: 0, totalPrice: 0, netWeight: 0, grossWeight: 0, packages: 0, 
+        packingType: '', volume: 0 
+      }])
     }
   }
 
@@ -886,7 +971,7 @@ export default function NewOrder() {
               </button>
               
               {/* 上传文件 */}
-              <input
+                  <input
                 ref={fileInputRef}
                 type="file"
                 accept=".xlsx,.xls,.csv"
@@ -923,7 +1008,7 @@ export default function NewOrder() {
                   清空
                 </button>
               )}
-            </div>
+                </div>
           </div>
 
           {/* 上传错误提示 */}
@@ -931,89 +1016,190 @@ export default function NewOrder() {
             <div className="mb-3 p-3 bg-red-50 border border-red-200 rounded-lg flex items-center text-sm text-red-700">
               <AlertCircle className="w-4 h-4 mr-2 flex-shrink-0" />
               {uploadError}
-              <button
-                type="button"
+                <button
+                  type="button"
                 onClick={() => setUploadError('')}
                 className="ml-auto text-red-500 hover:text-red-700"
-              >
+                >
                 <X className="w-4 h-4" />
-              </button>
-            </div>
+                </button>
+              </div>
           )}
 
           {/* 导入统计 */}
           {cargoItems.length > 1 && (
-            <div className="mb-3 p-3 bg-blue-50 border border-blue-200 rounded-lg flex items-center text-sm text-blue-700">
-              <FileSpreadsheet className="w-4 h-4 mr-2 flex-shrink-0" />
-              共 {cargoItems.filter(item => item.productName || item.productNameEn).length} 条货物记录
-              {cargoItems.some(item => item.quantity > 0) && (
-                <span className="ml-2">
-                  | 总数量: {cargoItems.reduce((sum, item) => sum + (item.quantity || 0), 0).toLocaleString()}
-                </span>
-              )}
-              {cargoItems.some(item => item.unitPrice > 0) && (
-                <span className="ml-2">
-                  | 总金额: ${cargoItems.reduce((sum, item) => sum + (item.quantity || 0) * (item.unitPrice || 0), 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                </span>
-              )}
+            <div className="mb-3 p-3 bg-blue-50 border border-blue-200 rounded-lg flex flex-wrap items-center gap-3 text-sm text-blue-700">
+              <span className="flex items-center">
+                <FileSpreadsheet className="w-4 h-4 mr-1.5 flex-shrink-0" />
+                共 <strong className="mx-1">{cargoItems.filter(item => item.productName || item.productNameEn).length}</strong> 条记录
+              </span>
+              <span className="text-blue-300">|</span>
+              <span>总金额: <strong>${cargoItems.reduce((sum, item) => sum + (item.totalPrice || 0), 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</strong></span>
+              <span className="text-blue-300">|</span>
+              <span>毛重: <strong>{cargoItems.reduce((sum, item) => sum + (item.grossWeight || 0), 0).toLocaleString(undefined, { minimumFractionDigits: 2 })} KG</strong></span>
+              <span className="text-blue-300">|</span>
+              <span>件数: <strong>{cargoItems.reduce((sum, item) => sum + (item.packages || 0), 0).toLocaleString()}</strong></span>
+              <span className="text-blue-300">|</span>
+              <span>体积: <strong>{cargoItems.reduce((sum, item) => sum + (item.volume || 0), 0).toLocaleString(undefined, { minimumFractionDigits: 2 })} CBM</strong></span>
             </div>
           )}
 
-          {/* 货物明细列表 */}
-          <div className="space-y-3">
-            {cargoItems.map((item, index) => (
-              <div key={index} className="flex items-start gap-2 p-3 bg-gray-50 rounded-lg">
-                <span className="w-6 h-6 flex items-center justify-center bg-gray-200 text-gray-600 text-xs rounded-full flex-shrink-0 mt-2">
-                  {index + 1}
-                </span>
-                <div className="grid grid-cols-2 md:grid-cols-5 gap-2 flex-1">
-                  <input
-                    type="text"
-                    placeholder="中文品名"
-                    value={item.productName}
-                    onChange={(e) => handleCargoChange(index, 'productName', e.target.value)}
-                    className="input text-sm"
-                  />
-                  <input
-                    type="text"
-                    placeholder="英文品名"
-                    value={item.productNameEn}
-                    onChange={(e) => handleCargoChange(index, 'productNameEn', e.target.value)}
-                    className="input text-sm"
-                  />
-                  <input
-                    type="text"
-                    placeholder="HS编码"
-                    value={item.hsCode}
-                    onChange={(e) => handleCargoChange(index, 'hsCode', e.target.value)}
-                    className="input text-sm"
-                  />
-                  <input
-                    type="number"
-                    placeholder="数量"
-                    value={item.quantity || ''}
-                    onChange={(e) => handleCargoChange(index, 'quantity', parseInt(e.target.value) || 0)}
-                    className="input text-sm"
-                  />
-                  <input
-                    type="number"
-                    step="0.01"
-                    placeholder="单价(USD)"
-                    value={item.unitPrice || ''}
-                    onChange={(e) => handleCargoChange(index, 'unitPrice', parseFloat(e.target.value) || 0)}
-                    className="input text-sm"
-                  />
-                </div>
-                <button
-                  type="button"
-                  onClick={() => removeCargoItem(index)}
-                  className="p-2 text-gray-400 hover:text-red-500 transition-colors"
-                  disabled={cargoItems.length === 1}
-                >
-                  <Trash2 className="w-4 h-4" />
-                </button>
-              </div>
-            ))}
+          {/* 货物明细列表 - 表格形式 */}
+          <div className="overflow-x-auto border border-gray-200 rounded-lg">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-2 py-2 text-xs font-medium text-gray-500 text-center w-10">序号</th>
+                  <th className="px-2 py-2 text-xs font-medium text-gray-500 text-left">唛头</th>
+                  <th className="px-2 py-2 text-xs font-medium text-gray-500 text-left">中文品名</th>
+                  <th className="px-2 py-2 text-xs font-medium text-gray-500 text-left">英文品名</th>
+                  <th className="px-2 py-2 text-xs font-medium text-gray-500 text-left">型号规格</th>
+                  <th className="px-2 py-2 text-xs font-medium text-gray-500 text-left">HS编码</th>
+                  <th className="px-2 py-2 text-xs font-medium text-gray-500 text-left">材质</th>
+                  <th className="px-2 py-2 text-xs font-medium text-gray-500 text-left">用途</th>
+                  <th className="px-2 py-2 text-xs font-medium text-gray-500 text-left">品牌</th>
+                  <th className="px-2 py-2 text-xs font-medium text-gray-500 text-left">原产国</th>
+                  <th className="px-2 py-2 text-xs font-medium text-gray-500 text-right">数量</th>
+                  <th className="px-2 py-2 text-xs font-medium text-gray-500 text-center">单位</th>
+                  <th className="px-2 py-2 text-xs font-medium text-gray-500 text-right">单价USD</th>
+                  <th className="px-2 py-2 text-xs font-medium text-gray-500 text-right">总价USD</th>
+                  <th className="px-2 py-2 text-xs font-medium text-gray-500 text-right">净重KG</th>
+                  <th className="px-2 py-2 text-xs font-medium text-gray-500 text-right">毛重KG</th>
+                  <th className="px-2 py-2 text-xs font-medium text-gray-500 text-right">件数</th>
+                  <th className="px-2 py-2 text-xs font-medium text-gray-500 text-left">包装</th>
+                  <th className="px-2 py-2 text-xs font-medium text-gray-500 text-right">体积CBM</th>
+                  <th className="px-2 py-2 text-xs font-medium text-gray-500 text-center w-10">操作</th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {cargoItems.map((item, index) => (
+                  <tr key={index} className="hover:bg-gray-50">
+                    <td className="px-1 py-1 text-center">
+                      <span className="text-xs text-gray-500">{index + 1}</span>
+                    </td>
+                    <td className="px-1 py-1">
+                      <input type="text" value={item.marks} onChange={(e) => handleCargoChange(index, 'marks', e.target.value)}
+                        className="w-16 px-1 py-1 text-xs border border-gray-200 rounded focus:ring-1 focus:ring-primary-500 focus:border-primary-500" placeholder="唛头" />
+                    </td>
+                    <td className="px-1 py-1">
+                      <input type="text" value={item.productName} onChange={(e) => handleCargoChange(index, 'productName', e.target.value)}
+                        className="w-24 px-1 py-1 text-xs border border-gray-200 rounded focus:ring-1 focus:ring-primary-500 focus:border-primary-500" placeholder="中文品名" />
+                    </td>
+                    <td className="px-1 py-1">
+                      <input type="text" value={item.productNameEn} onChange={(e) => handleCargoChange(index, 'productNameEn', e.target.value)}
+                        className="w-28 px-1 py-1 text-xs border border-gray-200 rounded focus:ring-1 focus:ring-primary-500 focus:border-primary-500" placeholder="英文品名" />
+                    </td>
+                    <td className="px-1 py-1">
+                      <input type="text" value={item.spec} onChange={(e) => handleCargoChange(index, 'spec', e.target.value)}
+                        className="w-20 px-1 py-1 text-xs border border-gray-200 rounded focus:ring-1 focus:ring-primary-500 focus:border-primary-500" placeholder="型号规格" />
+                    </td>
+                    <td className="px-1 py-1">
+                      <input type="text" value={item.hsCode} onChange={(e) => handleCargoChange(index, 'hsCode', e.target.value)}
+                        className="w-20 px-1 py-1 text-xs border border-gray-200 rounded focus:ring-1 focus:ring-primary-500 focus:border-primary-500" placeholder="HS编码" />
+                    </td>
+                    <td className="px-1 py-1">
+                      <input type="text" value={item.material} onChange={(e) => handleCargoChange(index, 'material', e.target.value)}
+                        className="w-16 px-1 py-1 text-xs border border-gray-200 rounded focus:ring-1 focus:ring-primary-500 focus:border-primary-500" placeholder="材质" />
+                    </td>
+                    <td className="px-1 py-1">
+                      <input type="text" value={item.usage} onChange={(e) => handleCargoChange(index, 'usage', e.target.value)}
+                        className="w-16 px-1 py-1 text-xs border border-gray-200 rounded focus:ring-1 focus:ring-primary-500 focus:border-primary-500" placeholder="用途" />
+                    </td>
+                    <td className="px-1 py-1">
+                      <input type="text" value={item.brand} onChange={(e) => handleCargoChange(index, 'brand', e.target.value)}
+                        className="w-14 px-1 py-1 text-xs border border-gray-200 rounded focus:ring-1 focus:ring-primary-500 focus:border-primary-500" placeholder="品牌" />
+                    </td>
+                    <td className="px-1 py-1">
+                      <input type="text" value={item.origin} onChange={(e) => handleCargoChange(index, 'origin', e.target.value)}
+                        className="w-14 px-1 py-1 text-xs border border-gray-200 rounded focus:ring-1 focus:ring-primary-500 focus:border-primary-500" placeholder="原产国" />
+                    </td>
+                    <td className="px-1 py-1">
+                      <input type="number" value={item.quantity || ''} onChange={(e) => handleCargoChange(index, 'quantity', parseInt(e.target.value) || 0)}
+                        className="w-14 px-1 py-1 text-xs border border-gray-200 rounded focus:ring-1 focus:ring-primary-500 focus:border-primary-500 text-right" placeholder="数量" />
+                    </td>
+                    <td className="px-1 py-1">
+                      <select value={item.unit} onChange={(e) => handleCargoChange(index, 'unit', e.target.value)}
+                        className="w-14 px-1 py-1 text-xs border border-gray-200 rounded focus:ring-1 focus:ring-primary-500 focus:border-primary-500">
+                        <option value="PCS">PCS</option>
+                        <option value="SET">SET</option>
+                        <option value="KG">KG</option>
+                        <option value="MT">MT</option>
+                        <option value="CTN">CTN</option>
+                        <option value="PKG">PKG</option>
+                        <option value="ROLL">ROLL</option>
+                        <option value="M">M</option>
+                        <option value="M2">M²</option>
+                        <option value="M3">M³</option>
+                      </select>
+                    </td>
+                    <td className="px-1 py-1">
+                      <input type="number" step="0.01" value={item.unitPrice || ''} onChange={(e) => handleCargoChange(index, 'unitPrice', parseFloat(e.target.value) || 0)}
+                        className="w-16 px-1 py-1 text-xs border border-gray-200 rounded focus:ring-1 focus:ring-primary-500 focus:border-primary-500 text-right" placeholder="单价" />
+                    </td>
+                    <td className="px-1 py-1">
+                      <input type="number" step="0.01" value={item.totalPrice || ''} onChange={(e) => handleCargoChange(index, 'totalPrice', parseFloat(e.target.value) || 0)}
+                        className="w-18 px-1 py-1 text-xs border border-gray-200 rounded focus:ring-1 focus:ring-primary-500 focus:border-primary-500 text-right" placeholder="总价" />
+                    </td>
+                    <td className="px-1 py-1">
+                      <input type="number" step="0.01" value={item.netWeight || ''} onChange={(e) => handleCargoChange(index, 'netWeight', parseFloat(e.target.value) || 0)}
+                        className="w-16 px-1 py-1 text-xs border border-gray-200 rounded focus:ring-1 focus:ring-primary-500 focus:border-primary-500 text-right" placeholder="净重" />
+                    </td>
+                    <td className="px-1 py-1">
+                      <input type="number" step="0.01" value={item.grossWeight || ''} onChange={(e) => handleCargoChange(index, 'grossWeight', parseFloat(e.target.value) || 0)}
+                        className="w-16 px-1 py-1 text-xs border border-gray-200 rounded focus:ring-1 focus:ring-primary-500 focus:border-primary-500 text-right" placeholder="毛重" />
+                    </td>
+                    <td className="px-1 py-1">
+                      <input type="number" value={item.packages || ''} onChange={(e) => handleCargoChange(index, 'packages', parseInt(e.target.value) || 0)}
+                        className="w-12 px-1 py-1 text-xs border border-gray-200 rounded focus:ring-1 focus:ring-primary-500 focus:border-primary-500 text-right" placeholder="件数" />
+                    </td>
+                    <td className="px-1 py-1">
+                      <input type="text" value={item.packingType} onChange={(e) => handleCargoChange(index, 'packingType', e.target.value)}
+                        className="w-14 px-1 py-1 text-xs border border-gray-200 rounded focus:ring-1 focus:ring-primary-500 focus:border-primary-500" placeholder="包装" />
+                    </td>
+                    <td className="px-1 py-1">
+                      <input type="number" step="0.01" value={item.volume || ''} onChange={(e) => handleCargoChange(index, 'volume', parseFloat(e.target.value) || 0)}
+                        className="w-14 px-1 py-1 text-xs border border-gray-200 rounded focus:ring-1 focus:ring-primary-500 focus:border-primary-500 text-right" placeholder="体积" />
+                    </td>
+                    <td className="px-1 py-1 text-center">
+                      <button type="button" onClick={() => removeCargoItem(index)} disabled={cargoItems.length === 1}
+                        className="p-1 text-gray-400 hover:text-red-500 disabled:opacity-30 transition-colors">
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+              {/* 合计行 */}
+              {cargoItems.length > 0 && (
+                <tfoot className="bg-gray-100">
+                  <tr>
+                    <td colSpan={10} className="px-2 py-2 text-xs font-medium text-gray-700 text-right">合计:</td>
+                    <td className="px-2 py-2 text-xs font-medium text-gray-900 text-right">
+                      {cargoItems.reduce((sum, item) => sum + (item.quantity || 0), 0).toLocaleString()}
+                    </td>
+                    <td className="px-2 py-2"></td>
+                    <td className="px-2 py-2"></td>
+                    <td className="px-2 py-2 text-xs font-medium text-gray-900 text-right">
+                      ${cargoItems.reduce((sum, item) => sum + (item.totalPrice || 0), 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                    </td>
+                    <td className="px-2 py-2 text-xs font-medium text-gray-900 text-right">
+                      {cargoItems.reduce((sum, item) => sum + (item.netWeight || 0), 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                    </td>
+                    <td className="px-2 py-2 text-xs font-medium text-gray-900 text-right">
+                      {cargoItems.reduce((sum, item) => sum + (item.grossWeight || 0), 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                    </td>
+                    <td className="px-2 py-2 text-xs font-medium text-gray-900 text-right">
+                      {cargoItems.reduce((sum, item) => sum + (item.packages || 0), 0).toLocaleString()}
+                    </td>
+                    <td className="px-2 py-2"></td>
+                    <td className="px-2 py-2 text-xs font-medium text-gray-900 text-right">
+                      {cargoItems.reduce((sum, item) => sum + (item.volume || 0), 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                    </td>
+                    <td className="px-2 py-2"></td>
+                  </tr>
+                </tfoot>
+              )}
+            </table>
           </div>
           <button
             type="button"
