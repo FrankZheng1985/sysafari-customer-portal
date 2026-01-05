@@ -6,6 +6,21 @@ const API_URL = '/api'
 
 const currencyOptions = ['EUR', 'USD', 'CNY', 'GBP']
 
+// 汇率（相对于欧元）- 实际项目中应从API获取实时汇率
+const exchangeRates: Record<string, number> = {
+  EUR: 1,
+  USD: 0.92,  // 1 USD ≈ 0.92 EUR
+  CNY: 0.13,  // 1 CNY ≈ 0.13 EUR
+  GBP: 1.17,  // 1 GBP ≈ 1.17 EUR
+}
+
+// 清关方式
+type CustomsProcedure = '40' | '42'
+const customsProcedureOptions = [
+  { value: '40', label: '40号-实缴增值税清关', description: '进口时缴纳增值税' },
+  { value: '42', label: '42号-递延清关', description: '增值税递延至目的国' },
+]
+
 // 国家数据接口
 interface CountryData {
   id: string
@@ -59,6 +74,9 @@ export default function TariffCalculator() {
     weightUnit: 'KG',
   })
   
+  // 清关方式：40号实缴增值税 或 42号递延清关
+  const [customsProcedure, setCustomsProcedure] = useState<CustomsProcedure>('40')
+  
   // 从税率表获取的数据
   const [selectedRate, setSelectedRate] = useState<TariffRate | null>(null)
   const [searchResults, setSearchResults] = useState<TariffRate[]>([])
@@ -92,6 +110,8 @@ export default function TariffCalculator() {
     countervailingAmount: number
     totalTax: number
     totalCost: number
+    goodsValueEur: number  // 货值（欧元）
+    isVatDeferred: boolean // 是否递延增值税
   } | null>(null)
 
   // 点击外部关闭下拉框
@@ -245,11 +265,15 @@ export default function TariffCalculator() {
 
   // 关税计算
   const calculateTariff = () => {
-    const goodsValue = parseFloat(tariffCalc.goodsValue) || 0
-    if (goodsValue <= 0) {
+    const goodsValueOriginal = parseFloat(tariffCalc.goodsValue) || 0
+    if (goodsValueOriginal <= 0) {
       alert('请输入货物价值')
       return
     }
+    
+    // 将货值转换为欧元（欧洲清关统一使用欧元）
+    const exchangeRate = exchangeRates[tariffCalc.currency] || 1
+    const goodsValueEur = goodsValueOriginal * exchangeRate
     
     // 如果选择了税率则使用选择的税率，否则使用默认值
     const dutyRate = selectedRate?.dutyRate || 0
@@ -258,26 +282,29 @@ export default function TariffCalculator() {
     const antiDumpingRate = selectedRate?.antiDumpingRate || 0
     const countervailingRate = selectedRate?.countervailingRate || 0
     
-    // 关税 = 货值 * 关税税率
-    const dutyAmount = goodsValue * (dutyRate / 100)
+    // 关税 = 货值 * 关税税率（基于欧元）
+    const dutyAmount = goodsValueEur * (dutyRate / 100)
     
     // 反倾销税 = 货值 * 反倾销税率
-    const antiDumpingAmount = goodsValue * (antiDumpingRate / 100)
+    const antiDumpingAmount = goodsValueEur * (antiDumpingRate / 100)
     
     // 反补贴税 = 货值 * 反补贴税率
-    const countervailingAmount = goodsValue * (countervailingRate / 100)
+    const countervailingAmount = goodsValueEur * (countervailingRate / 100)
     
     // 增值税基数 = 货值 + 关税 + 反倾销税 + 反补贴税
-    const vatBase = goodsValue + dutyAmount + antiDumpingAmount + countervailingAmount
+    const vatBase = goodsValueEur + dutyAmount + antiDumpingAmount + countervailingAmount
     
-    // 增值税 = 增值税基数 * 增值税率
-    const vatAmount = vatBase * (vatRate / 100)
+    // 42号递延清关：增值税递延，不在进口时缴纳
+    const isVatDeferred = customsProcedure === '42'
     
-    // 总税费
+    // 增值税 = 增值税基数 * 增值税率（42号递延则为0）
+    const vatAmount = isVatDeferred ? 0 : vatBase * (vatRate / 100)
+    
+    // 总税费（进口时实际缴纳）
     const totalTax = dutyAmount + antiDumpingAmount + countervailingAmount + vatAmount
     
     // 总成本 = 货值 + 总税费
-    const totalCost = goodsValue + totalTax
+    const totalCost = goodsValueEur + totalTax
     
     setTariffResult({
       dutyAmount: Math.round(dutyAmount * 100) / 100,
@@ -286,6 +313,8 @@ export default function TariffCalculator() {
       countervailingAmount: Math.round(countervailingAmount * 100) / 100,
       totalTax: Math.round(totalTax * 100) / 100,
       totalCost: Math.round(totalCost * 100) / 100,
+      goodsValueEur: Math.round(goodsValueEur * 100) / 100,
+      isVatDeferred,
     })
   }
 
@@ -330,6 +359,7 @@ export default function TariffCalculator() {
     })
     setSelectedRate(null)
     setTariffResult(null)
+    setCustomsProcedure('40')
     // 重置国家搜索框
     const defaultExport = countries.find(c => c.countryCode === 'CN')
     const defaultImport = countries.find(c => c.countryCode === 'DE')
@@ -644,6 +674,47 @@ export default function TariffCalculator() {
               </div>
             )}
 
+            {/* 清关方式选择 */}
+            <h3 className="text-xs font-medium text-gray-700 border-b pb-2 mt-4">清关方式</h3>
+            <div className="grid grid-cols-2 gap-3">
+              {customsProcedureOptions.map((option) => (
+                <button
+                  key={option.value}
+                  type="button"
+                  onClick={() => {
+                    setCustomsProcedure(option.value as CustomsProcedure)
+                    setTariffResult(null)
+                  }}
+                  className={`p-3 rounded-lg border-2 text-left transition-all ${
+                    customsProcedure === option.value
+                      ? 'border-primary-500 bg-primary-50'
+                      : 'border-gray-200 bg-white hover:border-gray-300'
+                  }`}
+                >
+                  <div className={`text-sm font-medium ${
+                    customsProcedure === option.value ? 'text-primary-700' : 'text-gray-700'
+                  }`}>
+                    {option.label}
+                  </div>
+                  <div className={`text-xs mt-0.5 ${
+                    customsProcedure === option.value ? 'text-primary-600' : 'text-gray-500'
+                  }`}>
+                    {option.description}
+                  </div>
+                </button>
+              ))}
+            </div>
+            
+            {/* 42号递延清关提示 */}
+            {customsProcedure === '42' && (
+              <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg flex items-start gap-2">
+                <Info className="w-4 h-4 text-blue-500 mt-0.5 flex-shrink-0" />
+                <span className="text-xs text-blue-700">
+                  42号递延清关：货物进口时不缴纳增值税，增值税将在货物运至欧盟目的国后由收货人申报缴纳。适用于欧盟内部转运的货物。
+                </span>
+              </div>
+            )}
+
             {/* 货物信息 */}
             <h3 className="text-xs font-medium text-gray-700 border-b pb-2 mt-4">货物信息</h3>
 
@@ -747,15 +818,48 @@ export default function TariffCalculator() {
         {/* 计算结果 */}
         {tariffResult && (
           <div className="mt-6 p-4 bg-gradient-to-r from-orange-50 to-amber-50 rounded-lg border border-orange-200">
-            <h3 className="text-sm font-semibold text-gray-900 mb-4">税费明细</h3>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-sm font-semibold text-gray-900">税费明细</h3>
+              <div className="flex items-center gap-2">
+                {tariffCalc.currency !== 'EUR' && (
+                  <span className="text-xs text-gray-500">
+                    货值: {tariffCalc.currency} {tariffCalc.goodsValue} → EUR {tariffResult.goodsValueEur}
+                  </span>
+                )}
+                <span className={`text-xs px-2 py-0.5 rounded ${
+                  tariffResult.isVatDeferred 
+                    ? 'bg-blue-100 text-blue-700' 
+                    : 'bg-gray-100 text-gray-600'
+                }`}>
+                  {tariffResult.isVatDeferred ? '42号递延清关' : '40号实缴清关'}
+                </span>
+              </div>
+            </div>
             <div className="grid grid-cols-3 gap-3 mb-3">
               <div className="text-center p-3 bg-white rounded-lg">
                 <div className="text-xs text-gray-500 mb-1">关税</div>
-                <div className="text-lg font-bold text-gray-900">{tariffCalc.currency} {tariffResult.dutyAmount}</div>
+                <div className="text-lg font-bold text-gray-900">EUR {tariffResult.dutyAmount.toLocaleString()}</div>
               </div>
-              <div className="text-center p-3 bg-white rounded-lg">
-                <div className="text-xs text-gray-500 mb-1">增值税</div>
-                <div className="text-lg font-bold text-gray-900">{tariffCalc.currency} {tariffResult.vatAmount}</div>
+              <div className={`text-center p-3 rounded-lg ${
+                tariffResult.isVatDeferred ? 'bg-blue-50' : 'bg-white'
+              }`}>
+                <div className={`text-xs mb-1 ${
+                  tariffResult.isVatDeferred ? 'text-blue-600' : 'text-gray-500'
+                }`}>
+                  增值税
+                  {tariffResult.isVatDeferred && <span className="ml-1">(递延)</span>}
+                </div>
+                <div className={`text-lg font-bold ${
+                  tariffResult.isVatDeferred ? 'text-blue-600 line-through' : 'text-gray-900'
+                }`}>
+                  EUR {tariffResult.isVatDeferred 
+                    ? Math.round((tariffResult.goodsValueEur + tariffResult.dutyAmount + tariffResult.antiDumpingAmount + tariffResult.countervailingAmount) * (countryVatRate?.standardRate || 19) / 100 * 100) / 100 
+                    : tariffResult.vatAmount.toLocaleString()
+                  }
+                </div>
+                {tariffResult.isVatDeferred && (
+                  <div className="text-xs text-blue-500 mt-1">目的国申报缴纳</div>
+                )}
               </div>
               <div className={`text-center p-3 rounded-lg ${
                 (tariffResult.antiDumpingAmount > 0 || tariffResult.countervailingAmount > 0) 
@@ -774,7 +878,7 @@ export default function TariffCalculator() {
                     ? 'text-red-700'
                     : 'text-gray-900'
                 }`}>
-                  {tariffCalc.currency} {Math.round((tariffResult.antiDumpingAmount + tariffResult.countervailingAmount) * 100) / 100}
+                  EUR {Math.round((tariffResult.antiDumpingAmount + tariffResult.countervailingAmount) * 100) / 100}
                 </div>
                 {(tariffResult.antiDumpingAmount > 0 || tariffResult.countervailingAmount > 0) && (
                   <div className="text-xs text-red-500 mt-1">
@@ -793,12 +897,19 @@ export default function TariffCalculator() {
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div className="text-center p-3 bg-white rounded-lg border border-orange-200">
-                <div className="text-xs text-gray-500 mb-1">税费合计</div>
-                <div className="text-lg font-bold text-orange-600">{tariffCalc.currency} {tariffResult.totalTax}</div>
+                <div className="text-xs text-gray-500 mb-1">
+                  {tariffResult.isVatDeferred ? '进口实缴税费' : '税费合计'}
+                </div>
+                <div className="text-lg font-bold text-orange-600">EUR {tariffResult.totalTax.toLocaleString()}</div>
+                {tariffResult.isVatDeferred && (
+                  <div className="text-xs text-gray-400 mt-0.5">不含递延增值税</div>
+                )}
               </div>
               <div className="text-center p-3 bg-orange-500 rounded-lg">
-                <div className="text-xs text-orange-100 mb-1">含税总成本</div>
-                <div className="text-xl font-bold text-white">{tariffCalc.currency} {tariffResult.totalCost}</div>
+                <div className="text-xs text-orange-100 mb-1">
+                  {tariffResult.isVatDeferred ? '进口含税成本' : '含税总成本'}
+                </div>
+                <div className="text-xl font-bold text-white">EUR {tariffResult.totalCost.toLocaleString()}</div>
               </div>
             </div>
           </div>
@@ -809,13 +920,14 @@ export default function TariffCalculator() {
       <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
         <h4 className="text-sm font-medium text-amber-800 mb-2">计算说明</h4>
         <ul className="text-xs text-amber-700 space-y-1">
-          <li>• 关税 = 货值 × 关税税率</li>
-          <li>• 反倾销税 = 货值 × 反倾销税率（如适用）</li>
-          <li>• 反补贴税 = 货值 × 反补贴税率（如适用）</li>
+          <li>• <strong>货币换算</strong>：所有税费按欧元(EUR)计算，非欧元货值自动转换</li>
+          <li>• 关税 = 货值(EUR) × 关税税率</li>
+          <li>• 反倾销税 = 货值(EUR) × 反倾销税率（如适用）</li>
+          <li>• 反补贴税 = 货值(EUR) × 反补贴税率（如适用）</li>
           <li>• 增值税 = (货值 + 关税 + 反倾销税 + 反补贴税) × 增值税率</li>
-          <li>• 总税费 = 关税 + 反倾销税 + 反补贴税 + 增值税</li>
-          <li>• 含税成本 = 货值 + 总税费</li>
-          <li>• 税率数据来源于系统税率管理，如需更新请联系管理员</li>
+          <li>• <strong>40号清关</strong>：进口时实缴所有税费（含增值税）</li>
+          <li>• <strong>42号递延清关</strong>：增值税递延至目的国缴纳，适用于欧盟内部转运</li>
+          <li>• 税率数据来源于系统税率管理，汇率仅供参考</li>
         </ul>
       </div>
     </div>
