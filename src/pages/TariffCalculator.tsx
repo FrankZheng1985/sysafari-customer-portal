@@ -629,6 +629,47 @@ export default function TariffCalculator() {
                 )}
               </div>
             </div>
+
+            {/* 清关方式选择 - 移到出口/进口国家下方 */}
+            <h3 className="text-xs font-medium text-gray-700 border-b pb-2 mt-4">清关方式</h3>
+            <div className="grid grid-cols-2 gap-3">
+              {customsProcedureOptions.map((option) => (
+                <button
+                  key={option.value}
+                  type="button"
+                  onClick={() => {
+                    setCustomsProcedure(option.value as CustomsProcedure)
+                    setTariffResult(null)
+                  }}
+                  className={`p-3 rounded-lg border-2 text-left transition-all ${
+                    customsProcedure === option.value
+                      ? 'border-primary-500 bg-primary-50'
+                      : 'border-gray-200 bg-white hover:border-gray-300'
+                  }`}
+                >
+                  <div className={`text-sm font-medium ${
+                    customsProcedure === option.value ? 'text-primary-700' : 'text-gray-700'
+                  }`}>
+                    {option.label}
+                  </div>
+                  <div className={`text-xs mt-0.5 ${
+                    customsProcedure === option.value ? 'text-primary-600' : 'text-gray-500'
+                  }`}>
+                    {option.description}
+                  </div>
+                </button>
+              ))}
+            </div>
+            
+            {/* 42号递延清关提示 */}
+            {customsProcedure === '42' && (
+              <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg flex items-start gap-2">
+                <Info className="w-4 h-4 text-blue-500 mt-0.5 flex-shrink-0" />
+                <span className="text-xs text-blue-700">
+                  42号递延清关：货物进口时不缴纳增值税，增值税将在货物运至欧盟目的国后由收货人申报缴纳。适用于欧盟内部转运的货物。
+                </span>
+              </div>
+            )}
           </div>
 
           {/* 右侧：税率信息 + 货物信息 */}
@@ -707,47 +748,6 @@ export default function TariffCalculator() {
                 <Info className="w-4 h-4 text-emerald-500 mt-0.5 flex-shrink-0" />
                 <span className="text-xs text-emerald-700">
                   增值税率 <span className="font-medium">{countryVatRate.standardRate}%</span> 来自 {countryVatRate.countryName}
-                </span>
-              </div>
-            )}
-
-            {/* 清关方式选择 */}
-            <h3 className="text-xs font-medium text-gray-700 border-b pb-2 mt-4">清关方式</h3>
-            <div className="grid grid-cols-2 gap-3">
-              {customsProcedureOptions.map((option) => (
-                <button
-                  key={option.value}
-                  type="button"
-                  onClick={() => {
-                    setCustomsProcedure(option.value as CustomsProcedure)
-                    setTariffResult(null)
-                  }}
-                  className={`p-3 rounded-lg border-2 text-left transition-all ${
-                    customsProcedure === option.value
-                      ? 'border-primary-500 bg-primary-50'
-                      : 'border-gray-200 bg-white hover:border-gray-300'
-                  }`}
-                >
-                  <div className={`text-sm font-medium ${
-                    customsProcedure === option.value ? 'text-primary-700' : 'text-gray-700'
-                  }`}>
-                    {option.label}
-                  </div>
-                  <div className={`text-xs mt-0.5 ${
-                    customsProcedure === option.value ? 'text-primary-600' : 'text-gray-500'
-                  }`}>
-                    {option.description}
-                  </div>
-                </button>
-              ))}
-            </div>
-            
-            {/* 42号递延清关提示 */}
-            {customsProcedure === '42' && (
-              <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg flex items-start gap-2">
-                <Info className="w-4 h-4 text-blue-500 mt-0.5 flex-shrink-0" />
-                <span className="text-xs text-blue-700">
-                  42号递延清关：货物进口时不缴纳增值税，增值税将在货物运至欧盟目的国后由收货人申报缴纳。适用于欧盟内部转运的货物。
                 </span>
               </div>
             )}
