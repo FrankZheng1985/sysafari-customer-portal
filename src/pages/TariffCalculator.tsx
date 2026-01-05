@@ -347,18 +347,26 @@ export default function TariffCalculator() {
     })
   }
 
-  // 过滤国家列表
-  const filteredExportCountries = countries.filter(c => 
-    c.countryNameCn.includes(exportCountrySearch) || 
-    c.countryNameEn.toLowerCase().includes(exportCountrySearch.toLowerCase()) ||
-    c.countryCode.toLowerCase().includes(exportCountrySearch.toLowerCase())
-  )
+  // 过滤国家列表（添加安全检查防止 undefined）
+  const filteredExportCountries = countries.filter(c => {
+    const nameCn = c.countryNameCn || ''
+    const nameEn = c.countryNameEn || ''
+    const code = c.countryCode || ''
+    const search = exportCountrySearch || ''
+    return nameCn.includes(search) || 
+      nameEn.toLowerCase().includes(search.toLowerCase()) ||
+      code.toLowerCase().includes(search.toLowerCase())
+  })
   
-  const filteredImportCountries = countries.filter(c => 
-    c.countryNameCn.includes(importCountrySearch) || 
-    c.countryNameEn.toLowerCase().includes(importCountrySearch.toLowerCase()) ||
-    c.countryCode.toLowerCase().includes(importCountrySearch.toLowerCase())
-  )
+  const filteredImportCountries = countries.filter(c => {
+    const nameCn = c.countryNameCn || ''
+    const nameEn = c.countryNameEn || ''
+    const code = c.countryCode || ''
+    const search = importCountrySearch || ''
+    return nameCn.includes(search) || 
+      nameEn.toLowerCase().includes(search.toLowerCase()) ||
+      code.toLowerCase().includes(search.toLowerCase())
+  })
 
   // 选择出口国家
   const handleSelectExportCountry = (country: CountryData) => {
