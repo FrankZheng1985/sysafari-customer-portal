@@ -355,21 +355,21 @@ export default function Orders() {
       <div className="card p-4">
         <div className="flex flex-col sm:flex-row gap-4">
           <div className="flex-1 relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
             <input
               type="text"
               placeholder="搜索提单号或柜号..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
-              className="input pl-10"
+              className="input input-with-icon-left"
             />
           </div>
           <button
             onClick={handleSearch}
             className="btn btn-primary"
           >
-            <Filter className="w-4 h-4 mr-2" />
+            <Filter className="w-4 h-4" />
             筛选
           </button>
         </div>

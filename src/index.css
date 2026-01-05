@@ -490,7 +490,7 @@ button:disabled {
 /* 输入框基础样式 */
 .input {
   width: 100%;
-  height: 32px;
+  height: 36px;
   padding: 0 12px;
   font-size: 13px;
   background-color: white;
@@ -512,6 +512,16 @@ button:disabled {
 .input:disabled {
   background-color: var(--color-gray-50);
   cursor: not-allowed;
+}
+
+/* 带图标的输入框 - 左侧图标 */
+.input-with-icon-left {
+  padding-left: 36px;
+}
+
+/* 带图标的输入框 - 右侧图标 */
+.input-with-icon-right {
+  padding-right: 36px;
 }
 
 /* 输入框尺寸 - 小 */
@@ -651,6 +661,7 @@ td {
 .data-table {
   width: 100%;
   border-collapse: collapse;
+  table-layout: fixed;
 }
 
 .data-table thead {
@@ -658,7 +669,7 @@ td {
 }
 
 .data-table th {
-  padding: 14px 24px;
+  padding: 12px 16px;
   text-align: left;
   font-weight: 600;
   font-size: 12px;
@@ -682,11 +693,14 @@ td {
 }
 
 .data-table td {
-  padding: 16px 24px;
-  font-size: 14px;
+  padding: 12px 16px;
+  font-size: 13px;
   color: var(--color-gray-900);
   border-bottom: 1px solid var(--color-gray-200);
   vertical-align: middle;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .data-table tbody tr:last-child td {
@@ -706,13 +720,13 @@ td {
 
 /* 紧凑模式表格 */
 .data-table-compact th {
-  padding: 10px 16px;
+  padding: 10px 12px;
   font-size: 11px;
 }
 
 .data-table-compact td {
-  padding: 12px 16px;
-  font-size: 13px;
+  padding: 10px 12px;
+  font-size: 12px;
 }
 
 /* ============================================
