@@ -6,15 +6,6 @@ const API_URL = '/api'
 
 const currencyOptions = ['EUR', 'USD', 'CNY', 'GBP']
 
-// 汇率数据接口
-interface ExchangeRateData {
-  base: string
-  rates: Record<string, number>
-  timestamp: number
-  source: string
-  warning?: string
-}
-
 // 默认汇率（备用）
 const defaultExchangeRates: Record<string, number> = {
   EUR: 1,
