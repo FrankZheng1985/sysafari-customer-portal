@@ -152,8 +152,8 @@ export default function Invoices() {
     <div className="space-y-6">
       {/* 页面标题 */}
       <div>
-        <h1 className="text-2xl font-bold text-gray-900">账单查询</h1>
-        <p className="text-sm text-gray-500 mt-1">查看您的所有账单和费用明细</p>
+        <h1 className="text-page-title">账单查询</h1>
+        <p className="text-small mt-1">查看您的所有账单和费用明细</p>
       </div>
 
       {/* 筛选 */}
@@ -188,13 +188,12 @@ export default function Invoices() {
               <table className="data-table">
                 <thead>
                   <tr>
-                    <th>账单号</th>
-                    <th>柜号/订单</th>
-                    <th>账单日期</th>
-                    <th>到期日</th>
+                    <th>发票号</th>
+                    <th>类型</th>
+                    <th>客户</th>
+                    <th>集装箱号/提单号</th>
                     <th className="text-right">金额</th>
-                    <th className="text-right">已付</th>
-                    <th className="text-right">余额</th>
+                    <th className="text-right">已付金额</th>
                     <th>状态</th>
                     <th className="text-center">操作</th>
                   </tr>
@@ -202,38 +201,54 @@ export default function Invoices() {
                 <tbody>
                   {invoices.map((invoice) => (
                     <tr key={invoice.id}>
-                      <td className="font-medium text-gray-900">{invoice.invoiceNumber}</td>
+                      {/* 发票号 + 日期 */}
                       <td>
-                        <div className="max-w-[150px]">
+                        <div>
+                          <div className="font-medium text-gray-900">{invoice.invoiceNumber}</div>
+                          <div className="text-xs text-gray-400 mt-0.5">{invoice.invoiceDate}</div>
+                        </div>
+                      </td>
+                      {/* 类型标签 */}
+                      <td>
+                        <span className="inline-flex items-center px-2.5 py-1 border border-primary-300 text-primary-600 text-xs font-medium rounded">
+                          销售发票
+                        </span>
+                      </td>
+                      {/* 客户名称 - 暂时显示占位符 */}
+                      <td className="text-gray-900">-</td>
+                      {/* 柜号/提单号 */}
+                      <td>
+                        <div className="max-w-[180px]">
                           {invoice.containerNumbers?.length > 0 ? (
-                            <div className="text-xs text-gray-600 truncate" title={invoice.containerNumbers.join(', ')}>
+                            <div className="text-gray-900" title={invoice.containerNumbers.join(', ')}>
                               {invoice.containerNumbers.slice(0, 2).join(', ')}
-                              {invoice.containerNumbers.length > 2 && `...+${invoice.containerNumbers.length - 2}`}
+                              {invoice.containerNumbers.length > 2 && ` +${invoice.containerNumbers.length - 2}`}
                             </div>
                           ) : invoice.billNumber ? (
-                            <span className="text-gray-600">{invoice.billNumber}</span>
+                            <span className="text-gray-900">{invoice.billNumber}</span>
                           ) : (
                             <span className="text-gray-400">-</span>
                           )}
                         </div>
                       </td>
-                      <td>{formatDate(invoice.invoiceDate)}</td>
-                      <td>{formatDate(invoice.dueDate)}</td>
-                      <td className="text-right font-medium">
-                        {invoice.currency} {invoice.totalAmount?.toLocaleString() || '0'}
+                      {/* 金额 */}
+                      <td className="text-right">
+                        <span className="font-medium text-gray-900">
+                          {invoice.totalAmount?.toLocaleString('de-DE', { minimumFractionDigits: 2 })} €
+                        </span>
                       </td>
-                      <td className="text-right text-green-600">
-                        {invoice.currency} {invoice.paidAmount?.toLocaleString() || '0'}
+                      {/* 已付金额 */}
+                      <td className="text-right">
+                        <span className="font-medium text-green-600">
+                          {invoice.paidAmount?.toLocaleString('de-DE', { minimumFractionDigits: 2 })} €
+                        </span>
                       </td>
-                      <td className="text-right font-medium text-amber-600">
-                        {invoice.currency} {invoice.balance?.toLocaleString() || '0'}
-                      </td>
+                      {/* 状态 */}
                       <td>
-                        <div className="flex flex-col items-center gap-1">
+                        <div className="flex flex-col items-start gap-1">
                           <span className={`status-badge ${getStatusColor(invoice.status)}`}>
                             {getStatusText(invoice.status)}
                           </span>
-                          {/* 文件状态标注 */}
                           {!invoice.pdfUrl && !invoice.excelUrl && (
                             <span className="text-xs text-orange-500 flex items-center gap-1">
                               <AlertCircle className="w-3 h-3" />
@@ -242,11 +257,12 @@ export default function Invoices() {
                           )}
                         </div>
                       </td>
+                      {/* 操作 */}
                       <td>
                         <div className="flex items-center justify-center gap-1">
                           <button
                             onClick={() => handleViewDetail(invoice)}
-                            className="p-1.5 hover:bg-gray-100 rounded text-gray-500 hover:text-primary-600"
+                            className="p-1.5 hover:bg-gray-100 rounded text-gray-500 hover:text-primary-600 transition-colors"
                             title="查看详情"
                           >
                             <Eye className="w-4 h-4" />
@@ -254,7 +270,7 @@ export default function Invoices() {
                           {invoice.pdfUrl ? (
                             <button
                               onClick={() => handleDownloadPdf(invoice)}
-                              className="p-1.5 hover:bg-gray-100 rounded text-gray-500 hover:text-red-600"
+                              className="p-1.5 hover:bg-gray-100 rounded text-gray-500 hover:text-red-600 transition-colors"
                               title="下载PDF发票"
                             >
                               <Download className="w-4 h-4" />
@@ -267,7 +283,7 @@ export default function Invoices() {
                           {invoice.excelUrl ? (
                             <button
                               onClick={() => handleDownloadExcel(invoice)}
-                              className="p-1.5 hover:bg-gray-100 rounded text-gray-500 hover:text-green-600"
+                              className="p-1.5 hover:bg-gray-100 rounded text-gray-500 hover:text-green-600 transition-colors"
                               title="下载Excel对账单"
                             >
                               <FileSpreadsheet className="w-4 h-4" />

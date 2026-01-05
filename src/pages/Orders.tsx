@@ -175,14 +175,14 @@ export default function Orders() {
       {/* 页面标题 */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">订单管理</h1>
-          <p className="text-sm text-gray-500 mt-1">查看和管理您的所有订单</p>
+          <h1 className="text-page-title">订单管理</h1>
+          <p className="text-small mt-1">查看和管理您的所有订单</p>
         </div>
         <Link
           to="/orders/new"
-          className="btn btn-primary inline-flex items-center"
+          className="btn btn-primary"
         >
-          <Plus className="w-4 h-4 mr-2" />
+          <Plus className="w-4 h-4" />
           创建订单
         </Link>
       </div>
@@ -394,37 +394,35 @@ export default function Orders() {
                     <th>目的港</th>
                     <th>ETD</th>
                     <th>ETA</th>
-                    <th>状态</th>
-                    <th>操作</th>
+                    <th className="text-center">状态</th>
+                    <th className="text-center">操作</th>
                   </tr>
                 </thead>
                 <tbody>
                   {orders.map((order) => (
                     <tr key={order.id}>
-                      <td className="font-medium text-gray-900">{order.orderNumber || '-'}</td>
-                      <td>{order.billNumber || '-'}</td>
-                      <td>{order.containerNumber || '-'}</td>
-                      <td>{order.portOfLoading || '-'}</td>
-                      <td>{order.portOfDischarge || '-'}</td>
-                      <td>{order.etd || '-'}</td>
-                      <td>{order.eta || '-'}</td>
                       <td>
-                        <div className="flex items-center justify-center">
-                          <span className={`status-badge ${getStatusColor(getOrderStatus(order))}`}>
-                            {getOrderStatus(order)}
-                          </span>
-                        </div>
+                        <span className="font-medium text-gray-900">{order.orderNumber || '-'}</span>
                       </td>
-                      <td>
-                        <div className="flex items-center justify-center">
-                          <Link
-                            to={`/orders/${order.id}`}
-                            className="p-1.5 hover:bg-gray-100 rounded text-gray-500 hover:text-primary-600"
-                            title="查看详情"
-                          >
-                            <Eye className="w-4 h-4" />
-                          </Link>
-                        </div>
+                      <td className="text-gray-700">{order.billNumber || '-'}</td>
+                      <td className="text-gray-700">{order.containerNumber || '-'}</td>
+                      <td className="text-gray-700">{order.portOfLoading || '-'}</td>
+                      <td className="text-gray-700">{order.portOfDischarge || '-'}</td>
+                      <td className="text-gray-700">{order.etd || '-'}</td>
+                      <td className="text-gray-700">{order.eta || '-'}</td>
+                      <td className="text-center">
+                        <span className={`status-badge ${getStatusColor(getOrderStatus(order))}`}>
+                          {getOrderStatus(order)}
+                        </span>
+                      </td>
+                      <td className="text-center">
+                        <Link
+                          to={`/orders/${order.id}`}
+                          className="inline-flex items-center justify-center p-1.5 hover:bg-gray-100 rounded text-gray-500 hover:text-primary-600 transition-colors"
+                          title="查看详情"
+                        >
+                          <Eye className="w-4 h-4" />
+                        </Link>
                       </td>
                     </tr>
                   ))}

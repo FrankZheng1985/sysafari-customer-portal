@@ -54,8 +54,8 @@ export default function Settings() {
     <div className="max-w-4xl mx-auto space-y-6">
       {/* 页面标题 */}
       <div>
-        <h1 className="text-2xl font-bold text-gray-900">账户设置</h1>
-        <p className="text-sm text-gray-500 mt-1">管理您的账户信息和安全设置</p>
+        <h1 className="text-page-title">账户设置</h1>
+        <p className="text-small mt-1">管理您的账户信息和安全设置</p>
       </div>
 
       {/* 标签页 */}

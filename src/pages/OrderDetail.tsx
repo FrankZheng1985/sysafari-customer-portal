@@ -156,10 +156,8 @@ export default function OrderDetail() {
             <ArrowLeft className="w-5 h-5 text-gray-500" />
           </Link>
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">
-              订单 {order.orderNumber}
-            </h1>
-            <p className="text-sm text-gray-500 mt-0.5">
+            <h1 className="text-page-title">订单 {order.orderNumber}</h1>
+            <p className="text-small mt-0.5">
               提单号: {order.billNumber || '-'} | 柜号: {order.containerNumber || '-'}
             </p>
           </div>

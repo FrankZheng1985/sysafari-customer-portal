@@ -24,8 +24,8 @@ export default function ApiDocs() {
     <div className="space-y-6">
       {/* 页面标题 */}
       <div>
-        <h1 className="text-2xl font-bold text-gray-900">API 对接文档</h1>
-        <p className="text-sm text-gray-500 mt-1">将您的 ERP/WMS 系统与 Sysafari 物流系统对接</p>
+        <h1 className="text-page-title">API 对接文档</h1>
+        <p className="text-small mt-1">将您的 ERP/WMS 系统与 Sysafari 物流系统对接</p>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">

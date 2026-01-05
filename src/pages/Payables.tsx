@@ -56,8 +56,8 @@ export default function Payables() {
     <div className="space-y-6">
       {/* 页面标题 */}
       <div>
-        <h1 className="text-2xl font-bold text-gray-900">应付账款</h1>
-        <p className="text-sm text-gray-500 mt-1">查看账款余额和账龄分析</p>
+        <h1 className="text-page-title">应付账款</h1>
+        <p className="text-small mt-1">查看账款余额和账龄分析</p>
       </div>
 
       {/* 汇总卡片 */}

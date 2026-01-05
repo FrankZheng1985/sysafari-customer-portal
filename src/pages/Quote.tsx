@@ -565,10 +565,8 @@ export default function Quote() {
     <div className="space-y-6">
       {/* 页面标题 */}
       <div>
-        <h1 className="text-2xl font-semibold text-gray-900">在线询价</h1>
-        <p className="mt-1 text-sm text-gray-500">
-          获取清关和运输费用报价
-        </p>
+        <h1 className="text-page-title">在线询价</h1>
+        <p className="text-small mt-1">获取清关和运输费用报价</p>
       </div>
 
       {/* Tab 切换 */}
