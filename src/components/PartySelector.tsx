@@ -7,7 +7,7 @@ import { portalApi } from '../utils/api'
 import { 
   User, Plus, ChevronDown, Star, Trash2, Edit2, 
   Save, X, Building2, MapPin, Phone, Mail, 
-  Check, AlertCircle, Loader2
+  AlertCircle, Loader2
 } from 'lucide-react'
 
 // 发货人/收货人数据类型

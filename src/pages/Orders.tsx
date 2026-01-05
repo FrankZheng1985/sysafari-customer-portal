@@ -349,45 +349,45 @@ export default function Orders() {
         {/* 筛选面板 */}
         {showFilters && (
           <div className="mt-4 pt-4 border-t border-gray-100">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-x-6 gap-y-4">
               {/* ETD 日期范围 */}
               <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1.5">ETD 日期范围</label>
-                <div className="flex items-center gap-2">
-                  <input
-                    type="date"
-                    value={etdStart}
-                    onChange={(e) => setEtdStart(e.target.value)}
-                    className="input text-sm flex-1"
-                  />
-                  <span className="text-gray-400">至</span>
-                  <input
-                    type="date"
-                    value={etdEnd}
-                    onChange={(e) => setEtdEnd(e.target.value)}
-                    className="input text-sm flex-1"
-                  />
-                </div>
+                <label className="block text-xs font-medium text-gray-500 mb-1.5">ETD 开始</label>
+                <input
+                  type="date"
+                  value={etdStart}
+                  onChange={(e) => setEtdStart(e.target.value)}
+                  className="input text-sm w-full"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-500 mb-1.5">ETD 结束</label>
+                <input
+                  type="date"
+                  value={etdEnd}
+                  onChange={(e) => setEtdEnd(e.target.value)}
+                  className="input text-sm w-full"
+                />
               </div>
               
               {/* ETA 日期范围 */}
               <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1.5">ETA 日期范围</label>
-                <div className="flex items-center gap-2">
-                  <input
-                    type="date"
-                    value={etaStart}
-                    onChange={(e) => setEtaStart(e.target.value)}
-                    className="input text-sm flex-1"
-                  />
-                  <span className="text-gray-400">至</span>
-                  <input
-                    type="date"
-                    value={etaEnd}
-                    onChange={(e) => setEtaEnd(e.target.value)}
-                    className="input text-sm flex-1"
-                  />
-                </div>
+                <label className="block text-xs font-medium text-gray-500 mb-1.5">ETA 开始</label>
+                <input
+                  type="date"
+                  value={etaStart}
+                  onChange={(e) => setEtaStart(e.target.value)}
+                  className="input text-sm w-full"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-500 mb-1.5">ETA 结束</label>
+                <input
+                  type="date"
+                  value={etaEnd}
+                  onChange={(e) => setEtaEnd(e.target.value)}
+                  className="input text-sm w-full"
+                />
               </div>
               
               {/* 港口筛选 */}
@@ -401,7 +401,6 @@ export default function Orders() {
                   className="input text-sm w-full"
                 />
               </div>
-              
               <div>
                 <label className="block text-xs font-medium text-gray-500 mb-1.5">目的港</label>
                 <input
