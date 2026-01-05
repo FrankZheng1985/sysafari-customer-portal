@@ -524,6 +524,25 @@ export default function PartySelector({
   
   return (
     <div className={`relative ${className}`} ref={dropdownRef}>
+      {/* 选择按钮 - 移到顶部 */}
+      <button
+        type="button"
+        onClick={() => setShowDropdown(!showDropdown)}
+        className={`
+          px-4 py-1.5 text-sm font-medium rounded-full
+          transition-all duration-200 ease-in-out
+          flex items-center gap-1.5 mb-2
+          ${showDropdown 
+            ? 'bg-primary-600 text-white shadow-md' 
+            : 'bg-white text-gray-600 border border-gray-200 hover:border-primary-300 hover:text-primary-600 hover:bg-primary-50 shadow-sm'
+          }
+        `}
+      >
+        <User className="w-3.5 h-3.5" />
+        <span>从地址簿选择</span>
+        <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-200 ${showDropdown ? 'rotate-180' : ''}`} />
+      </button>
+      
       {label && (
         <label className="block text-sm font-medium text-gray-700 mb-1">
           {label} {required && <span className="text-red-500">*</span>}
@@ -536,30 +555,9 @@ export default function PartySelector({
           value={value}
           onChange={(e) => onChange(e.target.value)}
           rows={3}
-          className="input pr-4 pb-10"
+          className="input pr-4"
           placeholder={placeholder || `${typeLabel}名称、地址、联系方式`}
         />
-        
-        {/* 选择按钮 - 底部居中 */}
-        <div className="absolute bottom-2 left-0 right-0 flex justify-center">
-          <button
-            type="button"
-            onClick={() => setShowDropdown(!showDropdown)}
-            className={`
-              px-4 py-1.5 text-sm font-medium rounded-full
-              transition-all duration-200 ease-in-out
-              flex items-center gap-1.5
-              ${showDropdown 
-                ? 'bg-primary-600 text-white shadow-md' 
-                : 'bg-white text-gray-600 border border-gray-200 hover:border-primary-300 hover:text-primary-600 hover:bg-primary-50 shadow-sm'
-              }
-            `}
-          >
-            <User className="w-3.5 h-3.5" />
-            <span>从地址簿选择</span>
-            <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-200 ${showDropdown ? 'rotate-180' : ''}`} />
-          </button>
-        </div>
       </div>
       
       {/* 下拉列表 */}
