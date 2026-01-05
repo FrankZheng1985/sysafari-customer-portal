@@ -222,6 +222,40 @@ router.get('/vat-rates/:countryCode', async (req, res) => {
   }
 })
 
+/**
+ * 获取实时汇率（基于欧元）
+ * GET /api/exchange-rates
+ */
+router.get('/exchange-rates', async (req, res) => {
+  try {
+    const mainRes = await axios.get(`${MAIN_API_URL}/api/portal/exchange-rates`, {
+      headers: { 'x-api-key': MAIN_API_KEY },
+      timeout: 10000
+    })
+    res.json(mainRes.data)
+  } catch (error) {
+    console.error('获取汇率失败:', error.message)
+    // 返回备用汇率
+    res.json({
+      errCode: 200,
+      msg: 'success',
+      data: {
+        base: 'EUR',
+        rates: {
+          EUR: 1,
+          USD: 0.92,
+          CNY: 0.13,
+          GBP: 1.17,
+          JPY: 0.006
+        },
+        timestamp: Date.now(),
+        source: 'fallback',
+        warning: '使用备用汇率'
+      }
+    })
+  }
+})
+
 // ==================== 地址管理 ====================
 
 /**

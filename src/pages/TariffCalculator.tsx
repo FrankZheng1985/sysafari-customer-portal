@@ -6,12 +6,21 @@ const API_URL = '/api'
 
 const currencyOptions = ['EUR', 'USD', 'CNY', 'GBP']
 
-// 汇率（相对于欧元）- 实际项目中应从API获取实时汇率
-const exchangeRates: Record<string, number> = {
+// 汇率数据接口
+interface ExchangeRateData {
+  base: string
+  rates: Record<string, number>
+  timestamp: number
+  source: string
+  warning?: string
+}
+
+// 默认汇率（备用）
+const defaultExchangeRates: Record<string, number> = {
   EUR: 1,
-  USD: 0.92,  // 1 USD ≈ 0.92 EUR
-  CNY: 0.13,  // 1 CNY ≈ 0.13 EUR
-  GBP: 1.17,  // 1 GBP ≈ 1.17 EUR
+  USD: 0.92,
+  CNY: 0.13,
+  GBP: 1.17,
 }
 
 // 清关方式
@@ -76,6 +85,11 @@ export default function TariffCalculator() {
   
   // 清关方式：40号实缴增值税 或 42号递延清关
   const [customsProcedure, setCustomsProcedure] = useState<CustomsProcedure>('40')
+  
+  // 汇率数据
+  const [exchangeRates, setExchangeRates] = useState<Record<string, number>>(defaultExchangeRates)
+  const [exchangeRateSource, setExchangeRateSource] = useState<string>('default')
+  const [loadingRates, setLoadingRates] = useState(false)
   
   // 从税率表获取的数据
   const [selectedRate, setSelectedRate] = useState<TariffRate | null>(null)
@@ -154,6 +168,30 @@ export default function TariffCalculator() {
     }
     fetchCountries()
   // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  // 获取实时汇率
+  useEffect(() => {
+    const fetchExchangeRates = async () => {
+      setLoadingRates(true)
+      try {
+        const response = await fetch(`${API_URL}/exchange-rates`)
+        const data = await response.json()
+        if (data.errCode === 200 && data.data && data.data.rates) {
+          setExchangeRates(data.data.rates)
+          setExchangeRateSource(data.data.source || 'api')
+          if (data.data.warning) {
+            console.warn('汇率警告:', data.data.warning)
+          }
+        }
+      } catch (error) {
+        console.error('获取汇率失败:', error)
+        setExchangeRateSource('fallback')
+      } finally {
+        setLoadingRates(false)
+      }
+    }
+    fetchExchangeRates()
   }, [])
 
   // 获取进口国家的增值税率
@@ -272,7 +310,7 @@ export default function TariffCalculator() {
     }
     
     // 将货值转换为欧元（欧洲清关统一使用欧元）
-    const exchangeRate = exchangeRates[tariffCalc.currency] || 1
+    const exchangeRate = exchangeRates[tariffCalc.currency] || defaultExchangeRates[tariffCalc.currency] || 1
     const goodsValueEur = goodsValueOriginal * exchangeRate
     
     // 如果选择了税率则使用选择的税率，否则使用默认值
@@ -918,17 +956,31 @@ export default function TariffCalculator() {
 
       {/* 计算说明 */}
       <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
-        <h4 className="text-sm font-medium text-amber-800 mb-2">计算说明</h4>
+        <div className="flex items-center justify-between mb-2">
+          <h4 className="text-sm font-medium text-amber-800">计算说明</h4>
+          <span className={`text-xs px-2 py-0.5 rounded ${
+            exchangeRateSource === 'exchangerate-api.com' 
+              ? 'bg-green-100 text-green-700' 
+              : 'bg-gray-100 text-gray-600'
+          }`}>
+            {loadingRates ? '汇率加载中...' : 
+              exchangeRateSource === 'exchangerate-api.com' ? '✓ 实时汇率' : '参考汇率'}
+          </span>
+        </div>
         <ul className="text-xs text-amber-700 space-y-1">
-          <li>• <strong>货币换算</strong>：所有税费按欧元(EUR)计算，非欧元货值自动转换</li>
+          <li>• <strong>货币换算</strong>：所有税费按欧元(EUR)计算，非欧元货值自动转换（汇率来自 ERP 系统）</li>
           <li>• 关税 = 货值(EUR) × 关税税率</li>
           <li>• 反倾销税 = 货值(EUR) × 反倾销税率（如适用）</li>
           <li>• 反补贴税 = 货值(EUR) × 反补贴税率（如适用）</li>
           <li>• 增值税 = (货值 + 关税 + 反倾销税 + 反补贴税) × 增值税率</li>
           <li>• <strong>40号清关</strong>：进口时实缴所有税费（含增值税）</li>
           <li>• <strong>42号递延清关</strong>：增值税递延至目的国缴纳，适用于欧盟内部转运</li>
-          <li>• 税率数据来源于系统税率管理，汇率仅供参考</li>
         </ul>
+        {tariffCalc.currency !== 'EUR' && (
+          <div className="mt-2 pt-2 border-t border-amber-200 text-xs text-amber-600">
+            当前汇率：1 {tariffCalc.currency} ≈ {(exchangeRates[tariffCalc.currency] || defaultExchangeRates[tariffCalc.currency] || 1).toFixed(4)} EUR
+          </div>
+        )}
       </div>
     </div>
   )
