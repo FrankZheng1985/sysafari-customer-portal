@@ -61,6 +61,10 @@ export default function Orders() {
   const [portOfLoading, setPortOfLoading] = useState('')
   const [portOfDischarge, setPortOfDischarge] = useState('')
   
+  // 港口选项列表
+  const [loadingPorts, setLoadingPorts] = useState<string[]>([])
+  const [dischargePorts, setDischargePorts] = useState<string[]>([])
+  
   // 可选的每页条数
   const pageSizeOptions = [10, 20, 50, 100]
   
@@ -69,6 +73,7 @@ export default function Orders() {
 
   useEffect(() => {
     fetchStats()
+    fetchPorts()
   }, [])
 
   useEffect(() => {
@@ -83,6 +88,18 @@ export default function Orders() {
       }
     } catch (error) {
       console.error('获取订单统计失败:', error)
+    }
+  }
+  
+  const fetchPorts = async () => {
+    try {
+      const res = await portalApi.getPorts()
+      if (res.data.errCode === 200 && res.data.data) {
+        setLoadingPorts(res.data.data.loadingPorts || [])
+        setDischargePorts(res.data.data.dischargePorts || [])
+      }
+    } catch (error) {
+      console.error('获取港口列表失败:', error)
     }
   }
 
@@ -382,23 +399,29 @@ export default function Orders() {
               {/* 港口筛选 */}
               <div>
                 <label className="block text-xs font-medium text-gray-500 mb-1.5">起运港</label>
-                <input
-                  type="text"
-                  placeholder="输入起运港..."
+                <select
                   value={portOfLoading}
                   onChange={(e) => setPortOfLoading(e.target.value)}
                   className="input text-sm w-full"
-                />
+                >
+                  <option value="">全部起运港</option>
+                  {loadingPorts.map(port => (
+                    <option key={port} value={port}>{port}</option>
+                  ))}
+                </select>
               </div>
               <div>
                 <label className="block text-xs font-medium text-gray-500 mb-1.5">目的港</label>
-                <input
-                  type="text"
-                  placeholder="输入目的港..."
+                <select
                   value={portOfDischarge}
                   onChange={(e) => setPortOfDischarge(e.target.value)}
                   className="input text-sm w-full"
-                />
+                >
+                  <option value="">全部目的港</option>
+                  {dischargePorts.map(port => (
+                    <option key={port} value={port}>{port}</option>
+                  ))}
+                </select>
               </div>
             </div>
             

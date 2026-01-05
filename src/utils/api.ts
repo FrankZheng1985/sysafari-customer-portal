@@ -112,6 +112,9 @@ export const portalApi = {
   
   getOrderStats: () => mainApi.get('/orders/stats'),
   
+  // 获取港口选项
+  getPorts: () => mainApi.get('/orders/ports'),
+  
   // ==================== 财务/账单相关（从主系统获取）====================
   getInvoices: (params?: {
     page?: number

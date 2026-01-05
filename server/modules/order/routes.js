@@ -142,6 +142,54 @@ router.get('/stats', authenticate, async (req, res) => {
 })
 
 /**
+ * 获取港口选项列表
+ * GET /api/orders/ports
+ * 返回当前客户订单中所有唯一的起运港和目的港
+ */
+router.get('/ports', authenticate, async (req, res) => {
+  try {
+    const db = getDatabase()
+    const customerId = req.customer.customerId
+    
+    // 获取所有唯一的起运港
+    const loadingPorts = await db.prepare(`
+      SELECT DISTINCT port_of_loading as port
+      FROM bills_of_lading
+      WHERE customer_id = $1 AND port_of_loading IS NOT NULL AND port_of_loading != ''
+      ORDER BY port_of_loading
+    `).all(customerId)
+    
+    // 获取所有唯一的目的港
+    const dischargePorts = await db.prepare(`
+      SELECT DISTINCT port_of_discharge as port
+      FROM bills_of_lading
+      WHERE customer_id = $1 AND port_of_discharge IS NOT NULL AND port_of_discharge != ''
+      ORDER BY port_of_discharge
+    `).all(customerId)
+    
+    res.json({
+      errCode: 200,
+      msg: 'success',
+      data: {
+        loadingPorts: (loadingPorts || []).map(p => p.port),
+        dischargePorts: (dischargePorts || []).map(p => p.port)
+      }
+    })
+    
+  } catch (error) {
+    console.error('获取港口列表失败:', error.message)
+    res.json({
+      errCode: 200,
+      msg: 'success',
+      data: {
+        loadingPorts: [],
+        dischargePorts: []
+      }
+    })
+  }
+})
+
+/**
  * 获取订单列表
  * GET /api/orders
  */
