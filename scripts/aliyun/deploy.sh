@@ -38,6 +38,15 @@ cd $APP_DIR
 echo "🔨 构建前端..."
 npm run build
 
+# 同步前端文件到 Nginx 服务目录
+echo "📁 同步前端文件..."
+rm -rf /var/www/portal/*
+cp -r $APP_DIR/dist/* /var/www/portal/
+
+# 重载 Nginx
+echo "🔄 重载 Nginx..."
+systemctl reload nginx
+
 # 重启 PM2 服务
 echo "🔄 重启 PM2 服务..."
 pm2 restart portal-api || pm2 start scripts/aliyun/ecosystem.config.cjs
