@@ -531,25 +531,35 @@ export default function PartySelector({
       )}
       
       {/* 输入区域 */}
-      <div className="relative">
+      <div className="relative group">
         <textarea
           value={value}
           onChange={(e) => onChange(e.target.value)}
           rows={3}
-          className="input pr-24"
+          className="input pr-4 pb-10"
           placeholder={placeholder || `${typeLabel}名称、地址、联系方式`}
         />
         
-        {/* 选择按钮 */}
-        <button
-          type="button"
-          onClick={() => setShowDropdown(!showDropdown)}
-          className="absolute right-2 top-2 px-3 py-1.5 bg-primary-50 text-primary-600 text-sm rounded-lg hover:bg-primary-100 flex items-center"
-        >
-          <User className="w-4 h-4 mr-1" />
-          选择
-          <ChevronDown className={`w-4 h-4 ml-1 transition-transform ${showDropdown ? 'rotate-180' : ''}`} />
-        </button>
+        {/* 选择按钮 - 底部居中 */}
+        <div className="absolute bottom-2 left-0 right-0 flex justify-center">
+          <button
+            type="button"
+            onClick={() => setShowDropdown(!showDropdown)}
+            className={`
+              px-4 py-1.5 text-sm font-medium rounded-full
+              transition-all duration-200 ease-in-out
+              flex items-center gap-1.5
+              ${showDropdown 
+                ? 'bg-primary-600 text-white shadow-md' 
+                : 'bg-white text-gray-600 border border-gray-200 hover:border-primary-300 hover:text-primary-600 hover:bg-primary-50 shadow-sm'
+              }
+            `}
+          >
+            <User className="w-3.5 h-3.5" />
+            <span>从地址簿选择</span>
+            <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-200 ${showDropdown ? 'rotate-180' : ''}`} />
+          </button>
+        </div>
       </div>
       
       {/* 下拉列表 */}
