@@ -64,6 +64,7 @@ export default function NewOrder() {
     billType: 'master',            // 提单类型: master(船东单) / house(货代单)
     // 额外服务
     containerReturn: 'local',      // 异地还柜: remote(异地还柜) / local(本地还柜)
+    containerReturnLocation: '',   // 异地还柜地点
     fullContainerDelivery: 'full', // 全程整柜运输: full(必须整柜派送) / devan(可拆柜后托盘送货)
     lastMileTransport: 'truck',    // 末端运输方式
     devanService: 'no',            // 拆柜: yes(需要拆柜分货服务) / no(不需要拆柜)
@@ -110,6 +111,26 @@ export default function NewOrder() {
     
     if (!formData.shipper && !formData.consignee) {
       setError('发货人或收货人至少填写一个')
+      return
+    }
+    
+    // 验证必填字段
+    if (!formData.shippingLine) {
+      setError('请选择船公司')
+      return
+    }
+    if (!formData.containerNumber) {
+      setError('请填写集装箱号')
+      return
+    }
+    if (!formData.containerType) {
+      setError('请选择柜型')
+      return
+    }
+    
+    // 如果选择异地还柜，必须填写还柜地点
+    if (formData.containerReturn === 'remote' && !formData.containerReturnLocation) {
+      setError('请填写异地还柜地点')
       return
     }
     
@@ -231,15 +252,16 @@ export default function NewOrder() {
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                船公司
+                船公司 <span className="text-red-500">*</span>
               </label>
               <select
                 name="shippingLine"
                 value={formData.shippingLine}
                 onChange={handleChange}
                 className="input"
+                required
               >
-                <option value="">选择或输入船公司</option>
+                <option value="">选择船公司</option>
                 {shippingLines.map(line => (
                   <option key={line} value={line}>{line}</option>
                 ))}
@@ -260,7 +282,7 @@ export default function NewOrder() {
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                集装箱号
+                集装箱号 <span className="text-red-500">*</span>
               </label>
               <input
                 type="text"
@@ -269,19 +291,21 @@ export default function NewOrder() {
                 onChange={handleChange}
                 className="input"
                 placeholder="如 COSU1234567"
+                required
               />
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                柜型
+                柜型 <span className="text-red-500">*</span>
               </label>
               <select
                 name="containerType"
                 value={formData.containerType}
                 onChange={handleChange}
                 className="input"
+                required
               >
-                <option value="">请选择</option>
+                <option value="">请选择柜型</option>
                 <option value="20GP">20GP</option>
                 <option value="40GP">40GP</option>
                 <option value="40HQ">40HQ</option>
@@ -483,18 +507,32 @@ export default function NewOrder() {
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 异地还柜 <span className="text-red-500">*</span>
               </label>
-              <div className="space-y-2">
-                <label className="flex items-center">
-                  <input
-                    type="radio"
-                    name="containerReturn"
-                    value="remote"
-                    checked={formData.containerReturn === 'remote'}
-                    onChange={handleChange}
-                    className="w-4 h-4 text-primary-600 border-gray-300 focus:ring-primary-500"
-                  />
-                  <span className="ml-2 text-sm text-gray-700">异地还柜 (非Rotterdam)</span>
-                </label>
+              <div className="space-y-3">
+                <div className="flex items-center gap-4">
+                  <label className="flex items-center">
+                    <input
+                      type="radio"
+                      name="containerReturn"
+                      value="remote"
+                      checked={formData.containerReturn === 'remote'}
+                      onChange={handleChange}
+                      className="w-4 h-4 text-primary-600 border-gray-300 focus:ring-primary-500"
+                    />
+                    <span className="ml-2 text-sm text-gray-700">异地还柜</span>
+                  </label>
+                  {/* 当选择异地还柜时，显示还柜地点输入框 */}
+                  {formData.containerReturn === 'remote' && (
+                    <input
+                      type="text"
+                      name="containerReturnLocation"
+                      value={formData.containerReturnLocation}
+                      onChange={handleChange}
+                      className="flex-1 px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                      placeholder="请输入还柜地点"
+                      required
+                    />
+                  )}
+                </div>
                 <label className="flex items-center">
                   <input
                     type="radio"
@@ -504,7 +542,7 @@ export default function NewOrder() {
                     onChange={handleChange}
                     className="w-4 h-4 text-primary-600 border-gray-300 focus:ring-primary-500"
                   />
-                  <span className="ml-2 text-sm text-gray-700">本地还柜</span>
+                  <span className="ml-2 text-sm text-gray-700">本地还柜 (Rotterdam)</span>
                 </label>
               </div>
             </div>

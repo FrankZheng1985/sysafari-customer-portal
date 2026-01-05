@@ -364,9 +364,15 @@ export default function Orders() {
             </div>
 
             {/* 分页 */}
-            <div className="flex items-center justify-end px-4 py-3 border-t border-gray-100 gap-4">
-              {/* 每页条数选择 */}
-              <div className="flex items-center">
+            <div className="flex items-center justify-between px-4 py-3 border-t border-gray-100">
+              {/* 左侧：记录统计 */}
+              <div className="text-sm text-gray-500">
+                共 <span className="font-medium text-gray-700">{total}</span> 条记录
+              </div>
+              
+              {/* 右侧：分页控件 */}
+              <div className="flex items-center gap-4">
+                {/* 每页条数选择 */}
                 <select
                   value={currentPageSize}
                   onChange={(e) => handlePageSizeChange(Number(e.target.value))}
@@ -376,30 +382,30 @@ export default function Orders() {
                     <option key={size} value={size}>{size} 条/页</option>
                   ))}
                 </select>
+                
+                {/* 上一页按钮 */}
+                <button
+                  onClick={() => setPage(p => Math.max(1, p - 1))}
+                  disabled={page === 1}
+                  className="px-4 py-1.5 border border-gray-200 rounded-lg text-sm text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                >
+                  上一页
+                </button>
+                
+                {/* 页码显示 */}
+                <span className="text-sm text-gray-600">
+                  第 {page} / {totalPages || 1} 页
+                </span>
+                
+                {/* 下一页按钮 */}
+                <button
+                  onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                  disabled={page === totalPages || totalPages === 0}
+                  className="px-4 py-1.5 border border-gray-200 rounded-lg text-sm text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                >
+                  下一页
+                </button>
               </div>
-              
-              {/* 上一页按钮 */}
-              <button
-                onClick={() => setPage(p => Math.max(1, p - 1))}
-                disabled={page === 1}
-                className="px-4 py-1.5 border border-gray-200 rounded-lg text-sm text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-              >
-                上一页
-              </button>
-              
-              {/* 页码显示 */}
-              <span className="text-sm text-gray-600">
-                第 {page} / {totalPages || 1} 页
-              </span>
-              
-              {/* 下一页按钮 */}
-              <button
-                onClick={() => setPage(p => Math.min(totalPages, p + 1))}
-                disabled={page === totalPages || totalPages === 0}
-                className="px-4 py-1.5 border border-gray-200 rounded-lg text-sm text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-              >
-                下一页
-              </button>
             </div>
           </>
         ) : (
