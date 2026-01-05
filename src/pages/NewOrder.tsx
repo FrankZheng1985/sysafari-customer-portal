@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { portalApi } from '../utils/api'
 import { ArrowLeft, Plus, Trash2, AlertCircle, CheckCircle, Ship, Plane, Truck, Train, Calendar } from 'lucide-react'
+import PartySelector from '../components/PartySelector'
 
 interface CargoItem {
   productName: string
@@ -664,19 +665,14 @@ export default function NewOrder() {
         <div className="card p-6">
           <h2 className="text-lg font-semibold text-gray-900 mb-4">发货信息</h2>
           <div className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                发货人 <span className="text-red-500">*</span>
-              </label>
-              <textarea
-                name="shipper"
-                value={formData.shipper}
-                onChange={handleChange}
-                rows={3}
-                className="input"
-                placeholder="发货人名称、地址、联系方式"
-              />
-            </div>
+            <PartySelector
+              type="shipper"
+              value={formData.shipper}
+              onChange={(value) => setFormData(prev => ({ ...prev, shipper: value }))}
+              label="发货人"
+              placeholder="发货人名称、地址、联系方式"
+              required
+            />
           </div>
         </div>
 
@@ -684,19 +680,14 @@ export default function NewOrder() {
         <div className="card p-6">
           <h2 className="text-lg font-semibold text-gray-900 mb-4">收货信息</h2>
           <div className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                收货人 <span className="text-red-500">*</span>
-              </label>
-              <textarea
-                name="consignee"
-                value={formData.consignee}
-                onChange={handleChange}
-                rows={3}
-                className="input"
-                placeholder="收货人名称、地址、联系方式"
-              />
-            </div>
+            <PartySelector
+              type="consignee"
+              value={formData.consignee}
+              onChange={(value) => setFormData(prev => ({ ...prev, consignee: value }))}
+              label="收货人"
+              placeholder="收货人名称、地址、联系方式"
+              required
+            />
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 送货地址

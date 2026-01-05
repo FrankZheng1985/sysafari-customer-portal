@@ -225,5 +225,81 @@ export const portalApi = {
   
   // 下载 Excel（账单页面使用）
   downloadInvoiceExcel: (id: string) => 
-    mainApi.get(`/invoices/${id}/excel`, { responseType: 'blob' })
+    mainApi.get(`/invoices/${id}/excel`, { responseType: 'blob' }),
+
+  // ==================== 发货人预设管理 ====================
+  // 获取发货人列表
+  getShippers: () => api.get('/shippers'),
+  
+  // 获取发货人详情
+  getShipperById: (id: string) => api.get(`/shippers/${id}`),
+  
+  // 创建发货人
+  createShipper: (data: {
+    name: string
+    nameEn?: string
+    shortName?: string
+    country?: string
+    province?: string
+    city?: string
+    district?: string
+    address?: string
+    addressEn?: string
+    postalCode?: string
+    contactPerson?: string
+    contactPhone?: string
+    mobile?: string
+    email?: string
+    fax?: string
+    taxNumber?: string
+    eoriNumber?: string
+    isDefault?: boolean
+    sortOrder?: number
+  }) => api.post('/shippers', data),
+  
+  // 更新发货人
+  updateShipper: (id: string, data: any) => api.put(`/shippers/${id}`, data),
+  
+  // 删除发货人
+  deleteShipper: (id: string) => api.delete(`/shippers/${id}`),
+  
+  // 设为默认发货人
+  setDefaultShipper: (id: string) => api.post(`/shippers/${id}/set-default`),
+
+  // ==================== 收货人预设管理 ====================
+  // 获取收货人列表
+  getConsignees: () => api.get('/shippers/consignees/list'),
+  
+  // 创建收货人
+  createConsignee: (data: {
+    name: string
+    nameEn?: string
+    shortName?: string
+    country?: string
+    province?: string
+    city?: string
+    district?: string
+    address?: string
+    addressEn?: string
+    postalCode?: string
+    contactPerson?: string
+    contactPhone?: string
+    mobile?: string
+    email?: string
+    fax?: string
+    taxNumber?: string
+    eoriNumber?: string
+    vatNumber?: string
+    isDefault?: boolean
+    sortOrder?: number
+  }) => api.post('/shippers/consignees', data),
+  
+  // 更新收货人
+  updateConsignee: (id: string, data: any) => api.put(`/shippers/consignees/${id}`, data),
+  
+  // 删除收货人
+  deleteConsignee: (id: string) => api.delete(`/shippers/consignees/${id}`),
+  
+  // 设为默认收货人
+  setDefaultConsignee: (id: string) => api.post(`/shippers/consignees/${id}/set-default`)
 }

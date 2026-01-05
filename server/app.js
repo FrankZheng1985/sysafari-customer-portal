@@ -29,6 +29,7 @@ import orderRoutes from './modules/order/routes.js'
 import financeRoutes from './modules/finance/routes.js'
 import apiKeysRoutes from './modules/api-keys/routes.js'
 import inquiryRoutes from './modules/inquiry/routes.js'
+import shipperRoutes from './modules/shipper/routes.js'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -244,6 +245,9 @@ app.use('/api/api-keys', apiKeysRoutes)
 
 // 询价模块（卡车类型、运输计算、清关估算、询价管理）
 app.use('/api', inquiryRoutes)
+
+// 发货人/收货人预设管理模块
+app.use('/api/shippers', shipperRoutes)
 
 // ==================== 错误处理 ====================
 
