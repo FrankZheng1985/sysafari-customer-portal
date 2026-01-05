@@ -6,8 +6,6 @@ import {
   Search,
   Filter,
   Plus,
-  ChevronLeft,
-  ChevronRight,
   Eye
 } from 'lucide-react'
 
@@ -44,11 +42,14 @@ export default function Orders() {
   const [loading, setLoading] = useState(true)
   const [page, setPage] = useState(1)
   const [total, setTotal] = useState(0)
-  const [pageSize] = useState(20)
+  const [currentPageSize, setCurrentPageSize] = useState(20)
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('')
   const [activeTab, setActiveTab] = useState<'all' | 'inProgress' | 'completed'>('all')
   const [stats, setStats] = useState<OrderStats>({ total: 0, inProgress: 0, completed: 0, totalWeight: 0, totalVolume: 0 })
+  
+  // 可选的每页条数
+  const pageSizeOptions = [10, 20, 50, 100]
 
   useEffect(() => {
     fetchStats()
@@ -56,7 +57,7 @@ export default function Orders() {
 
   useEffect(() => {
     fetchOrders()
-  }, [page, statusFilter, activeTab])
+  }, [page, statusFilter, activeTab, currentPageSize])
 
   const fetchStats = async () => {
     try {
@@ -75,7 +76,7 @@ export default function Orders() {
       // 根据分类标签确定筛选条件
       const params: any = {
         page,
-        pageSize,
+        pageSize: currentPageSize,
         billNumber: search || undefined
       }
       
@@ -158,7 +159,34 @@ export default function Orders() {
     setStatusFilter('')
   }
 
-  const totalPages = Math.ceil(total / pageSize)
+  const totalPages = Math.ceil(total / currentPageSize)
+
+  // 处理每页条数变化
+  const handlePageSizeChange = (newSize: number) => {
+    setCurrentPageSize(newSize)
+    setPage(1)
+  }
+
+  // 带 tooltip 的单元格组件
+  const TruncatedCell = ({ value, maxWidth = 120 }: { value: string | null | undefined, maxWidth?: number }) => {
+    if (!value) return <span className="text-gray-400">-</span>
+    return (
+      <div className="relative group">
+        <span 
+          className="block truncate text-gray-700" 
+          style={{ maxWidth: `${maxWidth}px` }}
+        >
+          {value}
+        </span>
+        {value.length > 10 && (
+          <div className="absolute left-0 bottom-full mb-2 px-3 py-2 bg-gray-900 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50 whitespace-nowrap">
+            {value}
+            <div className="absolute left-4 top-full w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-gray-900"></div>
+          </div>
+        )}
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-6">
@@ -299,14 +327,22 @@ export default function Orders() {
                   {orders.map((order) => (
                     <tr key={order.id}>
                       <td>
-                        <span className="font-medium text-gray-900">{order.orderNumber || '-'}</span>
+                        <TruncatedCell value={order.orderNumber} maxWidth={100} />
                       </td>
-                      <td className="text-gray-700">{order.billNumber || '-'}</td>
-                      <td className="text-gray-700">{order.containerNumber || '-'}</td>
-                      <td className="text-gray-700">{order.portOfLoading || '-'}</td>
-                      <td className="text-gray-700">{order.portOfDischarge || '-'}</td>
-                      <td className="text-gray-700">{order.etd || '-'}</td>
-                      <td className="text-gray-700">{order.eta || '-'}</td>
+                      <td>
+                        <TruncatedCell value={order.billNumber} maxWidth={120} />
+                      </td>
+                      <td>
+                        <TruncatedCell value={order.containerNumber} maxWidth={110} />
+                      </td>
+                      <td>
+                        <TruncatedCell value={order.portOfLoading} maxWidth={80} />
+                      </td>
+                      <td>
+                        <TruncatedCell value={order.portOfDischarge} maxWidth={80} />
+                      </td>
+                      <td className="text-gray-700 whitespace-nowrap">{order.etd || '-'}</td>
+                      <td className="text-gray-700 whitespace-nowrap">{order.eta || '-'}</td>
                       <td className="text-center">
                         <span className={`status-badge ${getStatusColor(getOrderStatus(order))}`}>
                           {getOrderStatus(order)}
@@ -328,32 +364,43 @@ export default function Orders() {
             </div>
 
             {/* 分页 */}
-            {totalPages > 1 && (
-              <div className="flex items-center justify-between px-4 py-3 border-t border-gray-100">
-                <div className="text-sm text-gray-500">
-                  共 {total} 条记录，第 {page} / {totalPages} 页
-                </div>
-                <div className="flex items-center space-x-2">
-                  <button
-                    onClick={() => setPage(p => Math.max(1, p - 1))}
-                    disabled={page === 1}
-                    className="p-2 rounded-lg hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    <ChevronLeft className="w-4 h-4" />
-                  </button>
-                  <span className="px-3 py-1 text-sm">
-                    {page}
-                  </span>
-                  <button
-                    onClick={() => setPage(p => Math.min(totalPages, p + 1))}
-                    disabled={page === totalPages}
-                    className="p-2 rounded-lg hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    <ChevronRight className="w-4 h-4" />
-                  </button>
-                </div>
+            <div className="flex items-center justify-end px-4 py-3 border-t border-gray-100 gap-4">
+              {/* 每页条数选择 */}
+              <div className="flex items-center">
+                <select
+                  value={currentPageSize}
+                  onChange={(e) => handlePageSizeChange(Number(e.target.value))}
+                  className="px-3 py-1.5 border border-gray-200 rounded-lg text-sm text-gray-700 bg-white focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent cursor-pointer"
+                >
+                  {pageSizeOptions.map(size => (
+                    <option key={size} value={size}>{size} 条/页</option>
+                  ))}
+                </select>
               </div>
-            )}
+              
+              {/* 上一页按钮 */}
+              <button
+                onClick={() => setPage(p => Math.max(1, p - 1))}
+                disabled={page === 1}
+                className="px-4 py-1.5 border border-gray-200 rounded-lg text-sm text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              >
+                上一页
+              </button>
+              
+              {/* 页码显示 */}
+              <span className="text-sm text-gray-600">
+                第 {page} / {totalPages || 1} 页
+              </span>
+              
+              {/* 下一页按钮 */}
+              <button
+                onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                disabled={page === totalPages || totalPages === 0}
+                className="px-4 py-1.5 border border-gray-200 rounded-lg text-sm text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              >
+                下一页
+              </button>
+            </div>
           </>
         ) : (
           <div className="flex flex-col items-center justify-center py-16">

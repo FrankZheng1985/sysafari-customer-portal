@@ -232,19 +232,6 @@ export default function NewOrder() {
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                提单号 <span className="text-red-500">*</span>
-              </label>
-              <input
-                type="text"
-                name="billNumber"
-                value={formData.billNumber}
-                onChange={handleChange}
-                className="input"
-                placeholder="输入完整提单号"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
                 船公司
               </label>
               <select
@@ -258,6 +245,32 @@ export default function NewOrder() {
                   <option key={line} value={line}>{line}</option>
                 ))}
               </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                提单号 <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="text"
+                name="billNumber"
+                value={formData.billNumber}
+                onChange={handleChange}
+                className="input"
+                placeholder="输入完整提单号"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                集装箱号
+              </label>
+              <input
+                type="text"
+                name="containerNumber"
+                value={formData.containerNumber}
+                onChange={handleChange}
+                className="input"
+                placeholder="如 COSU1234567"
+              />
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -281,19 +294,6 @@ export default function NewOrder() {
                 <option value="20FR">20FR (框架)</option>
                 <option value="40FR">40FR (框架)</option>
               </select>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                集装箱号
-              </label>
-              <input
-                type="text"
-                name="containerNumber"
-                value={formData.containerNumber}
-                onChange={handleChange}
-                className="input"
-                placeholder="如 COSU1234567"
-              />
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
