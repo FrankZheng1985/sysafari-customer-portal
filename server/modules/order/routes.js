@@ -80,17 +80,17 @@ router.get('/stats', authenticate, async (req, res) => {
     const customerId = req.customer.customerId
     
     // 获取订单统计 - 互斥状态（与ERP状态保持一致）
-    // ship_status 可能的值: '未到港', '已发运', '运输中', '已到港'
-    // customs_status 可能的值: null, '', '清关中', '查验中', '已放行'
-    // delivery_status 可能的值: null, '', '待派送', '派送中', '已送达', '异常关闭'
+    // ship_status 可能的值: NULL, '', '未到港', '已发运', '运输中', '已到港'
+    // customs_status 可能的值: NULL, '', '清关中', '查验中', '已放行'
+    // delivery_status 可能的值: NULL, '', '待派送', '派送中', '已送达', '异常关闭'
     const stats = await db.prepare(`
       SELECT 
         COUNT(*) as total,
-        COUNT(CASE WHEN ship_status IN ('未到港', '已发运', '运输中') AND (delivery_status IS NULL OR delivery_status = '' OR delivery_status NOT IN ('已送达', '异常关闭')) AND status != '已完成' THEN 1 END) as not_arrived,
-        COUNT(CASE WHEN ship_status = '已到港' AND (customs_status IS NULL OR customs_status = '' OR customs_status NOT IN ('已放行')) AND (delivery_status IS NULL OR delivery_status = '' OR delivery_status NOT IN ('已送达', '异常关闭')) AND status != '已完成' THEN 1 END) as arrived,
-        COUNT(CASE WHEN customs_status = '已放行' AND (delivery_status IS NULL OR delivery_status = '' OR delivery_status NOT IN ('派送中', '待派送', '已送达', '异常关闭')) AND status != '已完成' THEN 1 END) as customs_cleared,
-        COUNT(CASE WHEN delivery_status IN ('派送中', '待派送') AND status != '已完成' THEN 1 END) as delivering,
-        COUNT(CASE WHEN delivery_status = '已送达' OR delivery_status = '异常关闭' OR status = '已完成' THEN 1 END) as delivered
+        COUNT(CASE WHEN (ship_status IS NULL OR ship_status = '' OR ship_status IN ('未到港', '已发运', '运输中')) AND (delivery_status IS NULL OR delivery_status = '' OR delivery_status NOT IN ('已送达', '异常关闭')) AND status NOT IN ('已完成', '已归档', '已取消') THEN 1 END) as not_arrived,
+        COUNT(CASE WHEN ship_status = '已到港' AND (customs_status IS NULL OR customs_status = '' OR customs_status NOT IN ('已放行')) AND (delivery_status IS NULL OR delivery_status = '' OR delivery_status NOT IN ('已送达', '异常关闭')) AND status NOT IN ('已完成', '已归档', '已取消') THEN 1 END) as arrived,
+        COUNT(CASE WHEN customs_status = '已放行' AND (delivery_status IS NULL OR delivery_status = '' OR delivery_status NOT IN ('派送中', '待派送', '已送达', '异常关闭')) AND status NOT IN ('已完成', '已归档', '已取消') THEN 1 END) as customs_cleared,
+        COUNT(CASE WHEN delivery_status IN ('派送中', '待派送') AND status NOT IN ('已完成', '已归档', '已取消') THEN 1 END) as delivering,
+        COUNT(CASE WHEN delivery_status IN ('已送达', '异常关闭') OR status IN ('已完成', '已归档', '已取消') THEN 1 END) as delivered
       FROM bills_of_lading
       WHERE customer_id = $1
     `).get(customerId)
@@ -148,28 +148,28 @@ router.get('/', authenticate, async (req, res) => {
     }
     
     // 船运状态筛选（与ERP状态保持一致）
-    // ship_status 可能的值: '未到港', '已发运', '运输中', '已到港'
+    // ship_status 可能的值: NULL, '', '未到港', '已发运', '运输中', '已到港'
     if (shipStatus === 'not_arrived') {
-      // 未到港：包括未到港、已发运、运输中（排除已完成和已送达的订单）
-      whereClause += ` AND ship_status IN ('未到港', '已发运', '运输中') AND (delivery_status IS NULL OR delivery_status = '' OR delivery_status NOT IN ('已送达', '异常关闭')) AND status != '已完成'`
+      // 未到港：包括 NULL/空、未到港、已发运、运输中（排除已完成和已送达的订单）
+      whereClause += ` AND (ship_status IS NULL OR ship_status = '' OR ship_status IN ('未到港', '已发运', '运输中')) AND (delivery_status IS NULL OR delivery_status = '' OR delivery_status NOT IN ('已送达', '异常关闭')) AND status NOT IN ('已完成', '已归档', '已取消')`
     } else if (shipStatus === 'arrived') {
       // 已到港：已到港但未清关放行、未送达
-      whereClause += ` AND ship_status = '已到港' AND (customs_status IS NULL OR customs_status = '' OR customs_status NOT IN ('已放行')) AND (delivery_status IS NULL OR delivery_status = '' OR delivery_status NOT IN ('已送达', '异常关闭')) AND status != '已完成'`
+      whereClause += ` AND ship_status = '已到港' AND (customs_status IS NULL OR customs_status = '' OR customs_status NOT IN ('已放行')) AND (delivery_status IS NULL OR delivery_status = '' OR delivery_status NOT IN ('已送达', '异常关闭')) AND status NOT IN ('已完成', '已归档', '已取消')`
     }
     
     // 清关状态筛选
     if (customsStatus === 'cleared') {
       // 清关放行：已放行但未开始派送
-      whereClause += ` AND customs_status = '已放行' AND (delivery_status IS NULL OR delivery_status = '' OR delivery_status NOT IN ('派送中', '待派送', '已送达', '异常关闭')) AND status != '已完成'`
+      whereClause += ` AND customs_status = '已放行' AND (delivery_status IS NULL OR delivery_status = '' OR delivery_status NOT IN ('派送中', '待派送', '已送达', '异常关闭')) AND status NOT IN ('已完成', '已归档', '已取消')`
     }
     
     // 派送状态筛选
     if (deliveryStatus === 'delivering') {
       // 派送中：派送中或待派送
-      whereClause += ` AND delivery_status IN ('派送中', '待派送') AND status != '已完成'`
+      whereClause += ` AND delivery_status IN ('派送中', '待派送') AND status NOT IN ('已完成', '已归档', '已取消')`
     } else if (deliveryStatus === 'delivered') {
-      // 已送达：已送达、异常关闭或已完成
-      whereClause += ` AND (delivery_status IN ('已送达', '异常关闭') OR status = '已完成')`
+      // 已送达：已送达、异常关闭或已完成/已归档/已取消
+      whereClause += ` AND (delivery_status IN ('已送达', '异常关闭') OR status IN ('已完成', '已归档', '已取消'))`
     }
     
     // 提单号搜索

@@ -119,12 +119,13 @@ export default function Orders() {
   }
 
   // 获取订单综合状态（按物流流程优先级判断，与ERP状态保持一致）
-  // ship_status 可能的值: '未到港', '已发运', '运输中', '已到港'
+  // ship_status 可能的值: null, '', '未到港', '已发运', '运输中', '已到港'
   // customs_status 可能的值: null, '', '清关中', '查验中', '已放行'
   // delivery_status 可能的值: null, '', '待派送', '派送中', '已送达', '异常关闭'
   const getOrderStatus = (order: Order) => {
-    // 1. 已送达（最终状态）- 包括异常关闭
-    if (order.deliveryStatus === '已送达' || order.deliveryStatus === '异常关闭' || order.rawStatus === '已完成') {
+    // 1. 已送达（最终状态）- 包括异常关闭、已完成、已归档、已取消
+    if (order.deliveryStatus === '已送达' || order.deliveryStatus === '异常关闭' || 
+        order.rawStatus === '已完成' || order.rawStatus === '已归档' || order.rawStatus === '已取消') {
       return '已送达'
     }
     // 2. 派送中
@@ -143,12 +144,9 @@ export default function Orders() {
     if (order.shipStatus === '已到港') {
       return '已到港'
     }
-    // 6. 未到港（包括未到港、已发运、运输中）
-    if (order.shipStatus === '未到港' || order.shipStatus === '已发运' || order.shipStatus === '运输中') {
-      return '未到港'
-    }
-    // 默认状态（理论上不应该出现）
-    return '进行中'
+    // 6. 未到港（包括 null/空、未到港、已发运、运输中）
+    // 所有还未到港的订单都归入此分类
+    return '未到港'
   }
 
   // 获取状态对应的颜色
