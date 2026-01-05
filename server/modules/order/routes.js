@@ -80,10 +80,12 @@ router.get('/stats', authenticate, async (req, res) => {
     const customerId = req.customer.customerId
     
     // 获取订单统计 - 简化为：总订单数、进行中、已完成、总重量、总立方
+    // 注意：NOT IN 对 NULL 值返回 NULL，需要显式处理 NULL 和空字符串
     const stats = await db.prepare(`
       SELECT 
         COUNT(*) as total,
-        COUNT(CASE WHEN delivery_status NOT IN ('已送达', '异常关闭') AND status NOT IN ('已完成', '已归档', '已取消') THEN 1 END) as in_progress,
+        COUNT(CASE WHEN (delivery_status IS NULL OR delivery_status = '' OR delivery_status NOT IN ('已送达', '异常关闭')) 
+                   AND (status IS NULL OR status = '' OR status NOT IN ('已完成', '已归档', '已取消')) THEN 1 END) as in_progress,
         COUNT(CASE WHEN delivery_status IN ('已送达', '异常关闭') OR status IN ('已完成', '已归档', '已取消') THEN 1 END) as completed,
         COALESCE(SUM(weight), 0) as total_weight,
         COALESCE(SUM(volume), 0) as total_volume
