@@ -5,7 +5,6 @@
 
 import { Router } from 'express'
 import axios from 'axios'
-import { getDatabase } from '../../config/database.js'
 import { authenticate, logActivity } from '../../middleware/auth.js'
 
 const router = Router()
@@ -17,31 +16,56 @@ const MAIN_API_KEY = process.env.MAIN_API_KEY || ''
 /**
  * 获取应付款汇总（根路由，兼容 /api/payables）
  * GET /api/payables 或 /api/finance
+ * 从 ERP 主系统获取数据
  */
 router.get('/', authenticate, async (req, res) => {
   try {
-    const db = getDatabase()
     const customerId = req.customer.customerId
+    console.log(`[应付款查询] 客户ID: ${customerId}, 转发到ERP系统`)
     
-    // 从本地数据库获取应付款汇总
-    const summary = await db.prepare(`
-      SELECT 
-        COALESCE(SUM(CASE WHEN payment_status != '已结清' THEN total_amount ELSE 0 END), 0) as total_payable,
-        COALESCE(SUM(CASE WHEN payment_status != '已结清' AND due_date < CURRENT_DATE THEN total_amount ELSE 0 END), 0) as overdue,
-        COALESCE(SUM(CASE WHEN payment_status != '已结清' AND due_date >= CURRENT_DATE AND due_date <= CURRENT_DATE + 7 THEN total_amount ELSE 0 END), 0) as due_in_7_days,
-        COALESCE(SUM(CASE WHEN payment_status != '已结清' AND due_date >= CURRENT_DATE AND due_date <= CURRENT_DATE + 30 THEN total_amount ELSE 0 END), 0) as due_in_30_days
-      FROM invoices
-      WHERE customer_id = $1
-    `).get(customerId)
+    // 从主系统获取应付款汇总
+    const response = await axios.get(`${MAIN_API_URL}/api/portal/payables`, {
+      headers: {
+        'X-API-Key': MAIN_API_KEY,
+        'X-Portal-Customer': customerId,
+        'Authorization': req.headers.authorization
+      },
+      timeout: 15000
+    })
+    
+    console.log(`[应付款查询] ERP返回: ${JSON.stringify(response.data?.data?.summary || {})}`)
+    
+    // 转换数据格式，兼容前端显示
+    const erpData = response.data?.data || {}
+    const summary = erpData.summary || {}
+    const aging = erpData.aging || {}
     
     res.json({
       errCode: 200,
       msg: 'success',
       data: {
-        totalPayable: parseFloat(summary?.total_payable || 0),
-        overdue: parseFloat(summary?.overdue || 0),
-        dueIn7Days: parseFloat(summary?.due_in_7_days || 0),
-        dueIn30Days: parseFloat(summary?.due_in_30_days || 0),
+        // 汇总信息
+        summary: {
+          totalAmount: parseFloat(summary.totalAmount || 0),
+          paidAmount: parseFloat(summary.paidAmount || 0),
+          balance: parseFloat(summary.balance || 0),
+          overdueAmount: parseFloat(summary.overdueAmount || 0),
+          unpaidCount: parseInt(summary.unpaidCount || 0),
+          overdueCount: parseInt(summary.overdueCount || 0)
+        },
+        // 账龄分析
+        aging: {
+          current: parseFloat(aging.current || 0),
+          days1To30: parseFloat(aging.days1To30 || 0),
+          days31To60: parseFloat(aging.days31To60 || 0),
+          days61To90: parseFloat(aging.days61To90 || 0),
+          daysOver90: parseFloat(aging.daysOver90 || 0)
+        },
+        // 兼容旧格式
+        totalPayable: parseFloat(summary.balance || 0),
+        overdue: parseFloat(summary.overdueAmount || 0),
+        dueIn7Days: 0,
+        dueIn30Days: parseFloat(aging.current || 0),
         currency: 'EUR'
       }
     })
@@ -54,6 +78,21 @@ router.get('/', authenticate, async (req, res) => {
       errCode: 200,
       msg: 'success',
       data: {
+        summary: {
+          totalAmount: 0,
+          paidAmount: 0,
+          balance: 0,
+          overdueAmount: 0,
+          unpaidCount: 0,
+          overdueCount: 0
+        },
+        aging: {
+          current: 0,
+          days1To30: 0,
+          days31To60: 0,
+          days61To90: 0,
+          daysOver90: 0
+        },
         totalPayable: 0,
         overdue: 0,
         dueIn7Days: 0,
