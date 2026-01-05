@@ -3,6 +3,7 @@ import { useNavigate, Link } from 'react-router-dom'
 import { portalApi } from '../utils/api'
 import { ArrowLeft, Plus, Trash2, AlertCircle, CheckCircle, Ship, Plane, Truck, Train, Calendar } from 'lucide-react'
 import PartySelector from '../components/PartySelector'
+import AddressAutocomplete from '../components/AddressAutocomplete'
 
 interface CargoItem {
   productName: string
@@ -688,19 +689,12 @@ export default function NewOrder() {
               placeholder="收货人名称、地址、联系方式"
               required
             />
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                送货地址
-              </label>
-              <input
-                type="text"
-                name="placeOfDelivery"
-                value={formData.placeOfDelivery}
-                onChange={handleChange}
-                className="input"
-                placeholder="最终送货地址（如与收货人不同）"
-              />
-            </div>
+            <AddressAutocomplete
+              value={formData.placeOfDelivery}
+              onChange={(value) => setFormData(prev => ({ ...prev, placeOfDelivery: value }))}
+              label="送货地址"
+              placeholder="输入送货地址（支持HERE地址搜索）"
+            />
           </div>
         </div>
 

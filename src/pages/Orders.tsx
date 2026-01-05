@@ -11,6 +11,7 @@ import {
   ChevronUp,
   X
 } from 'lucide-react'
+import DateInput from '../components/DatePicker'
 
 interface OrderStats {
   total: number
@@ -351,44 +352,32 @@ export default function Orders() {
           <div className="mt-4 pt-4 border-t border-gray-100">
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-x-6 gap-y-4">
               {/* ETD 日期范围 */}
-              <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1.5">ETD 开始</label>
-                <input
-                  type="date"
-                  value={etdStart}
-                  onChange={(e) => setEtdStart(e.target.value)}
-                  className="input text-sm w-full"
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1.5">ETD 结束</label>
-                <input
-                  type="date"
-                  value={etdEnd}
-                  onChange={(e) => setEtdEnd(e.target.value)}
-                  className="input text-sm w-full"
-                />
-              </div>
+              <DateInput
+                label="ETD 开始"
+                value={etdStart}
+                onChange={setEtdStart}
+                placeholder="选择开始日期"
+              />
+              <DateInput
+                label="ETD 结束"
+                value={etdEnd}
+                onChange={setEtdEnd}
+                placeholder="选择结束日期"
+              />
               
               {/* ETA 日期范围 */}
-              <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1.5">ETA 开始</label>
-                <input
-                  type="date"
-                  value={etaStart}
-                  onChange={(e) => setEtaStart(e.target.value)}
-                  className="input text-sm w-full"
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1.5">ETA 结束</label>
-                <input
-                  type="date"
-                  value={etaEnd}
-                  onChange={(e) => setEtaEnd(e.target.value)}
-                  className="input text-sm w-full"
-                />
-              </div>
+              <DateInput
+                label="ETA 开始"
+                value={etaStart}
+                onChange={setEtaStart}
+                placeholder="选择开始日期"
+              />
+              <DateInput
+                label="ETA 结束"
+                value={etaEnd}
+                onChange={setEtaEnd}
+                placeholder="选择结束日期"
+              />
               
               {/* 港口筛选 */}
               <div>
