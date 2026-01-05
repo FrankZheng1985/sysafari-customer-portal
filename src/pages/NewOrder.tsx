@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { portalApi } from '../utils/api'
-import { ArrowLeft, Plus, Trash2, AlertCircle, CheckCircle, Ship, Plane, Truck } from 'lucide-react'
+import { ArrowLeft, Plus, Trash2, AlertCircle, CheckCircle, Ship, Plane, Truck, Calendar } from 'lucide-react'
 
 interface CargoItem {
   productName: string
@@ -36,7 +36,7 @@ export default function NewOrder() {
   const [formData, setFormData] = useState({
     // 基本信息
     transportMode: 'sea',          // 运输方式
-    externalOrderNo: '',           // 外部订单号
+    // 订单号由系统自动生成，不需要在表单中提交
     billNumber: '',                // 提单号
     shippingLine: '',              // 船公司
     containerNumber: '',           // 集装箱号
@@ -219,16 +219,15 @@ export default function NewOrder() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                外部订单号
+                订单号
               </label>
               <input
                 type="text"
-                name="externalOrderNo"
-                value={formData.externalOrderNo}
-                onChange={handleChange}
-                className="input"
-                placeholder="您系统中的订单号"
+                value="系统自动生成"
+                disabled
+                className="input bg-gray-100 text-gray-500 cursor-not-allowed"
               />
+              <p className="text-xs text-gray-400 mt-1">提交后系统将自动分配订单号</p>
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -378,25 +377,31 @@ export default function NewOrder() {
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 ETD (预计离港)
               </label>
-              <input
-                type="date"
-                name="etd"
-                value={formData.etd}
-                onChange={handleChange}
-                className="input"
-              />
+              <div className="relative">
+                <input
+                  type="date"
+                  name="etd"
+                  value={formData.etd}
+                  onChange={handleChange}
+                  className="input pr-10 cursor-pointer"
+                />
+                <Calendar className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+              </div>
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 ETA (预计到港)
               </label>
-              <input
-                type="date"
-                name="eta"
-                value={formData.eta}
-                onChange={handleChange}
-                className="input"
-              />
+              <div className="relative">
+                <input
+                  type="date"
+                  name="eta"
+                  value={formData.eta}
+                  onChange={handleChange}
+                  className="input pr-10 cursor-pointer"
+                />
+                <Calendar className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+              </div>
             </div>
           </div>
         </div>

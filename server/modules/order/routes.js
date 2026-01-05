@@ -11,15 +11,33 @@ import { v4 as uuidv4 } from 'uuid'
 const router = Router()
 
 /**
- * 生成订单号
+ * 生成订单号 - 使用数据库序列确保顺序唯一性
+ * 格式: BP + 年月日(6位) + 序号(4位)
+ * 例如: BP2501050001, BP2501050002...
  */
-function generateOrderNumber() {
+async function generateOrderNumber(db) {
   const now = new Date()
   const year = now.getFullYear().toString().slice(-2)
   const month = String(now.getMonth() + 1).padStart(2, '0')
   const day = String(now.getDate()).padStart(2, '0')
-  const random = Math.floor(Math.random() * 10000).toString().padStart(4, '0')
-  return `BP${year}${month}${day}${random}`
+  const datePrefix = `BP${year}${month}${day}`
+  
+  // 查询当天已有的最大序号
+  const result = await db.prepare(`
+    SELECT order_number FROM bills_of_lading 
+    WHERE order_number LIKE $1 
+    ORDER BY order_number DESC 
+    LIMIT 1
+  `).get(`${datePrefix}%`)
+  
+  let sequence = 1
+  if (result && result.order_number) {
+    // 提取序号部分并+1
+    const lastSequence = parseInt(result.order_number.slice(-4), 10)
+    sequence = lastSequence + 1
+  }
+  
+  return `${datePrefix}${String(sequence).padStart(4, '0')}`
 }
 
 /**
@@ -531,8 +549,8 @@ router.post('/', authenticate, async (req, res) => {
       })
     }
     
-    // 生成订单号
-    const orderNumber = generateOrderNumber()
+    // 生成订单号（使用数据库序列保证顺序）
+    const orderNumber = await generateOrderNumber(db)
     const orderId = uuidv4()
     
     // 运输方式映射
