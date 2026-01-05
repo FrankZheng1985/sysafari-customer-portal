@@ -6,7 +6,10 @@ import {
   Search,
   Filter,
   Plus,
-  Eye
+  Eye,
+  ChevronDown,
+  ChevronUp,
+  X
 } from 'lucide-react'
 
 interface OrderStats {
@@ -48,8 +51,20 @@ export default function Orders() {
   const [activeTab, setActiveTab] = useState<'all' | 'inProgress' | 'completed'>('all')
   const [stats, setStats] = useState<OrderStats>({ total: 0, inProgress: 0, completed: 0, totalWeight: 0, totalVolume: 0 })
   
+  // 筛选条件
+  const [showFilters, setShowFilters] = useState(false)
+  const [etdStart, setEtdStart] = useState('')
+  const [etdEnd, setEtdEnd] = useState('')
+  const [etaStart, setEtaStart] = useState('')
+  const [etaEnd, setEtaEnd] = useState('')
+  const [portOfLoading, setPortOfLoading] = useState('')
+  const [portOfDischarge, setPortOfDischarge] = useState('')
+  
   // 可选的每页条数
   const pageSizeOptions = [10, 20, 50, 100]
+  
+  // 检查是否有活动的筛选条件
+  const hasActiveFilters = etdStart || etdEnd || etaStart || etaEnd || portOfLoading || portOfDischarge
 
   useEffect(() => {
     fetchStats()
@@ -77,7 +92,15 @@ export default function Orders() {
       const params: any = {
         page,
         pageSize: currentPageSize,
-        billNumber: search || undefined
+        billNumber: search || undefined,
+        // 日期范围筛选
+        etdStart: etdStart || undefined,
+        etdEnd: etdEnd || undefined,
+        etaStart: etaStart || undefined,
+        etaEnd: etaEnd || undefined,
+        // 港口筛选
+        portOfLoading: portOfLoading || undefined,
+        portOfDischarge: portOfDischarge || undefined
       }
       
       // 设置状态筛选
@@ -105,6 +128,18 @@ export default function Orders() {
   const handleSearch = () => {
     setPage(1)
     fetchOrders()
+  }
+  
+  // 清除所有筛选条件
+  const clearFilters = () => {
+    setEtdStart('')
+    setEtdEnd('')
+    setEtaStart('')
+    setEtaEnd('')
+    setPortOfLoading('')
+    setPortOfDischarge('')
+    setSearch('')
+    setPage(1)
   }
 
   // 获取订单综合状态（按物流流程优先级判断，与ERP状态保持一致）
@@ -278,6 +313,7 @@ export default function Orders() {
 
       {/* 搜索和筛选 */}
       <div className="card p-4">
+        {/* 主搜索栏 */}
         <div className="flex flex-col sm:flex-row gap-4">
           <div className="flex-1 relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
@@ -291,13 +327,113 @@ export default function Orders() {
             />
           </div>
           <button
+            onClick={() => setShowFilters(!showFilters)}
+            className={`btn ${hasActiveFilters ? 'btn-primary' : 'btn-secondary'} relative`}
+          >
+            <Filter className="w-4 h-4" />
+            高级筛选
+            {showFilters ? <ChevronUp className="w-4 h-4 ml-1" /> : <ChevronDown className="w-4 h-4 ml-1" />}
+            {hasActiveFilters && (
+              <span className="absolute -top-1 -right-1 w-2 h-2 bg-red-500 rounded-full"></span>
+            )}
+          </button>
+          <button
             onClick={handleSearch}
             className="btn btn-primary"
           >
-            <Filter className="w-4 h-4" />
-            筛选
+            <Search className="w-4 h-4" />
+            搜索
           </button>
         </div>
+        
+        {/* 筛选面板 */}
+        {showFilters && (
+          <div className="mt-4 pt-4 border-t border-gray-100">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {/* ETD 日期范围 */}
+              <div>
+                <label className="block text-xs font-medium text-gray-500 mb-1.5">ETD 日期范围</label>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="date"
+                    value={etdStart}
+                    onChange={(e) => setEtdStart(e.target.value)}
+                    className="input text-sm flex-1"
+                  />
+                  <span className="text-gray-400">至</span>
+                  <input
+                    type="date"
+                    value={etdEnd}
+                    onChange={(e) => setEtdEnd(e.target.value)}
+                    className="input text-sm flex-1"
+                  />
+                </div>
+              </div>
+              
+              {/* ETA 日期范围 */}
+              <div>
+                <label className="block text-xs font-medium text-gray-500 mb-1.5">ETA 日期范围</label>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="date"
+                    value={etaStart}
+                    onChange={(e) => setEtaStart(e.target.value)}
+                    className="input text-sm flex-1"
+                  />
+                  <span className="text-gray-400">至</span>
+                  <input
+                    type="date"
+                    value={etaEnd}
+                    onChange={(e) => setEtaEnd(e.target.value)}
+                    className="input text-sm flex-1"
+                  />
+                </div>
+              </div>
+              
+              {/* 港口筛选 */}
+              <div>
+                <label className="block text-xs font-medium text-gray-500 mb-1.5">起运港</label>
+                <input
+                  type="text"
+                  placeholder="输入起运港..."
+                  value={portOfLoading}
+                  onChange={(e) => setPortOfLoading(e.target.value)}
+                  className="input text-sm w-full"
+                />
+              </div>
+              
+              <div>
+                <label className="block text-xs font-medium text-gray-500 mb-1.5">目的港</label>
+                <input
+                  type="text"
+                  placeholder="输入目的港..."
+                  value={portOfDischarge}
+                  onChange={(e) => setPortOfDischarge(e.target.value)}
+                  className="input text-sm w-full"
+                />
+              </div>
+            </div>
+            
+            {/* 筛选操作按钮 */}
+            <div className="flex justify-end gap-2 mt-4">
+              {hasActiveFilters && (
+                <button
+                  onClick={clearFilters}
+                  className="btn btn-secondary text-sm"
+                >
+                  <X className="w-4 h-4" />
+                  清除筛选
+                </button>
+              )}
+              <button
+                onClick={handleSearch}
+                className="btn btn-primary text-sm"
+              >
+                应用筛选
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* 订单列表 */}

@@ -147,7 +147,7 @@ router.get('/stats', authenticate, async (req, res) => {
  */
 router.get('/', authenticate, async (req, res) => {
   try {
-    const { page = 1, pageSize = 20, status, keyword, startDate, endDate, shipStatus, customsStatus, deliveryStatus, progressStatus, billNumber } = req.query
+    const { page = 1, pageSize = 20, status, keyword, startDate, endDate, shipStatus, customsStatus, deliveryStatus, progressStatus, billNumber, etdStart, etdEnd, etaStart, etaEnd, portOfLoading, portOfDischarge } = req.query
     const db = getDatabase()
     const customerId = req.customer.customerId
     
@@ -209,6 +209,38 @@ router.get('/', authenticate, async (req, res) => {
     if (endDate) {
       whereClause += ` AND created_at <= $${paramIndex++}`
       conditions.push(endDate)
+    }
+    
+    // ETD 日期范围筛选
+    if (etdStart) {
+      whereClause += ` AND etd >= $${paramIndex++}`
+      conditions.push(etdStart)
+    }
+    if (etdEnd) {
+      whereClause += ` AND etd <= $${paramIndex++}`
+      conditions.push(etdEnd)
+    }
+    
+    // ETA 日期范围筛选
+    if (etaStart) {
+      whereClause += ` AND eta >= $${paramIndex++}`
+      conditions.push(etaStart)
+    }
+    if (etaEnd) {
+      whereClause += ` AND eta <= $${paramIndex++}`
+      conditions.push(etaEnd)
+    }
+    
+    // 起运港筛选
+    if (portOfLoading) {
+      whereClause += ` AND port_of_loading ILIKE $${paramIndex++}`
+      conditions.push(`%${portOfLoading}%`)
+    }
+    
+    // 目的港筛选
+    if (portOfDischarge) {
+      whereClause += ` AND port_of_discharge ILIKE $${paramIndex++}`
+      conditions.push(`%${portOfDischarge}%`)
     }
     
     // 获取总数
