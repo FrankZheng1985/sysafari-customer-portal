@@ -275,11 +275,47 @@ async function initializeDatabase() {
       process.exit(1)
     }
     
+    // 自动迁移：添加缺失的额外服务字段
+    await runDatabaseMigrations()
+    
     console.log('📦 客户门户数据库初始化完成')
   } catch (error) {
     console.error('数据库初始化失败:', error)
     process.exit(1)
   }
+}
+
+/**
+ * 运行数据库迁移
+ * 自动添加缺失的字段到 bills_of_lading 表
+ */
+async function runDatabaseMigrations() {
+  const db = getDatabase()
+  
+  // 需要添加的额外服务字段
+  const newColumns = [
+    { name: 'cargo_type', type: 'VARCHAR(50)', comment: '箱型: 拼箱(CFS)/整箱(FCL)' },
+    { name: 'transport_service', type: 'VARCHAR(50)', comment: '运输方式: 委托我司运输/自行运输' },
+    { name: 'bill_type', type: 'VARCHAR(50)', comment: '提单类型: 船东单/货代单' },
+    { name: 'container_return', type: 'VARCHAR(50)', comment: '异地还柜: 异地还柜/本地还柜' },
+    { name: 'full_container_delivery', type: 'VARCHAR(50)', comment: '全程整柜运输: 必须整柜派送/可拆柜后托盘送货' },
+    { name: 'last_mile_transport', type: 'VARCHAR(50)', comment: '末端运输方式' },
+    { name: 'devan_service', type: 'VARCHAR(50)', comment: '拆柜服务: 需要拆柜分货服务/不需要拆柜' },
+    { name: 't1_customs_service', type: 'VARCHAR(10)', comment: 'T1报关服务: 是/否' }
+  ]
+  
+  for (const col of newColumns) {
+    try {
+      await db.exec(`ALTER TABLE bills_of_lading ADD COLUMN IF NOT EXISTS ${col.name} ${col.type}`)
+    } catch (err) {
+      // 字段已存在或其他错误，忽略
+      if (!err.message.includes('already exists') && !err.message.includes('duplicate column')) {
+        console.log(`  字段 ${col.name} 添加跳过: ${err.message}`)
+      }
+    }
+  }
+  
+  console.log('✅ 数据库字段迁移检查完成')
 }
 
 /**

@@ -500,6 +500,16 @@ router.post('/', authenticate, async (req, res) => {
       weight,                 // 重量
       volume,                 // 体积
       cargoItems,             // 货物明细
+      // 附加属性
+      cargoType,              // 箱型: CFS(拼箱) / FCL(整箱)
+      transportService,       // 运输: entrust(委托我司) / self(自行运输)
+      billType,               // 提单类型: master(船东单) / house(货代单)
+      // 额外服务
+      containerReturn,        // 异地还柜: remote(异地还柜) / local(本地还柜)
+      fullContainerDelivery,  // 全程整柜运输: full(必须整柜派送) / devan(可拆柜后托盘送货)
+      lastMileTransport,      // 末端运输方式
+      devanService,           // 拆柜: yes(需要拆柜分货服务) / no(不需要拆柜)
+      t1CustomsService,       // 海关经停报关服务(T1报关): yes / no
       // 其他
       serviceType,            // 服务类型
       remark                  // 备注
@@ -548,6 +558,16 @@ router.post('/', authenticate, async (req, res) => {
         .join('; ')
     }
     
+    // 附加属性映射
+    const cargoTypeMap = { 'CFS': '拼箱', 'FCL': '整箱' }
+    const transportServiceMap = { 'entrust': '委托我司运输', 'self': '自行运输' }
+    const billTypeMap = { 'master': '船东单', 'house': '货代单' }
+    const containerReturnMap = { 'remote': '异地还柜', 'local': '本地还柜' }
+    const fullContainerDeliveryMap = { 'full': '必须整柜派送', 'devan': '可拆柜后托盘送货' }
+    const lastMileTransportMap = { 'truck': '卡车派送', 'van': '小型货车派送', 'express': '快递派送', 'pickup': '客户自提' }
+    const devanServiceMap = { 'yes': '需要拆柜分货服务', 'no': '不需要拆柜' }
+    const t1CustomsServiceMap = { 'yes': '是', 'no': '否' }
+    
     // 插入订单到数据库
     await db.prepare(`
       INSERT INTO bills_of_lading (
@@ -560,6 +580,9 @@ router.post('/', authenticate, async (req, res) => {
         shipper, consignee,
         pieces, weight, volume,
         description, remark, service_type,
+        cargo_type, transport_service, bill_type,
+        container_return, full_container_delivery, last_mile_transport,
+        devan_service, t1_customs_service,
         status, ship_status, customs_status, delivery_status,
         source, created_at, updated_at
       ) VALUES (
@@ -572,8 +595,11 @@ router.post('/', authenticate, async (req, res) => {
         $21, $22,
         $23, $24, $25,
         $26, $27, $28,
-        $29, $30, $31, $32,
-        $33, NOW(), NOW()
+        $29, $30, $31,
+        $32, $33, $34,
+        $35, $36,
+        $37, $38, $39, $40,
+        $41, NOW(), NOW()
       )
     `).run(
       orderId, orderNumber, billNumber || null, externalOrderNo || null,
@@ -585,6 +611,9 @@ router.post('/', authenticate, async (req, res) => {
       shipper || null, consignee || null,
       pieces || null, weight || null, volume || null,
       description || null, remark || null, serviceType || 'door-to-door',
+      cargoTypeMap[cargoType] || '整箱', transportServiceMap[transportService] || '委托我司运输', billTypeMap[billType] || '船东单',
+      containerReturnMap[containerReturn] || '本地还柜', fullContainerDeliveryMap[fullContainerDelivery] || '必须整柜派送', lastMileTransportMap[lastMileTransport] || '卡车派送',
+      devanServiceMap[devanService] || '不需要拆柜', t1CustomsServiceMap[t1CustomsService] || '否',
       '待处理', '未到港', null, null,
       'customer_portal'  // 标记来源为客户门户
     )

@@ -1,3 +1,4 @@
+import { useEffect } from 'react'
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider, useAuth } from './contexts/AuthContext'
 import Layout from './components/Layout'
@@ -12,6 +13,41 @@ import Quote from './pages/Quote'
 import TariffCalculator from './pages/TariffCalculator'
 import ApiDocs from './pages/ApiDocs'
 import Settings from './pages/Settings'
+import { portalApi } from './utils/api'
+
+// 动态设置 Favicon 为公司 Logo
+function FaviconUpdater() {
+  useEffect(() => {
+    const updateFavicon = async () => {
+      try {
+        const response = await portalApi.getSystemLogo()
+        if (response.data.errCode === 200 && response.data.data?.logoUrl) {
+          const logoUrl = response.data.data.logoUrl
+          
+          // 查找现有的 favicon link 标签
+          let link = document.querySelector("link[rel*='icon']") as HTMLLinkElement
+          
+          if (!link) {
+            // 如果不存在，创建一个新的
+            link = document.createElement('link')
+            link.rel = 'icon'
+            document.head.appendChild(link)
+          }
+          
+          // 设置 favicon 为公司 Logo
+          link.type = 'image/png'
+          link.href = logoUrl
+        }
+      } catch (error) {
+        console.error('更新 Favicon 失败:', error)
+      }
+    }
+    
+    updateFavicon()
+  }, [])
+  
+  return null
+}
 
 // 受保护的路由组件
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
@@ -35,6 +71,7 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 function App() {
   return (
     <AuthProvider>
+      <FaviconUpdater />
       <Router>
         <Routes>
           {/* 公开路由 */}

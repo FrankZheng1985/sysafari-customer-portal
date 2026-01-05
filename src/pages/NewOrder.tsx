@@ -58,6 +58,16 @@ export default function NewOrder() {
     pieces: '',
     weight: '',
     volume: '',
+    // 附加属性
+    cargoType: 'FCL',              // 箱型: CFS(拼箱) / FCL(整箱)
+    transportService: 'entrust',   // 运输方式固定为委托我司运输
+    billType: 'master',            // 提单类型: master(船东单) / house(货代单)
+    // 额外服务
+    containerReturn: 'local',      // 异地还柜: remote(异地还柜) / local(本地还柜)
+    fullContainerDelivery: 'full', // 全程整柜运输: full(必须整柜派送) / devan(可拆柜后托盘送货)
+    lastMileTransport: 'truck',    // 末端运输方式
+    devanService: 'no',            // 拆柜: yes(需要拆柜分货服务) / no(不需要拆柜)
+    t1CustomsService: 'no',        // 海关经停报关服务(T1报关): yes / no
     // 其他
     serviceType: 'door-to-door',
     remark: ''
@@ -387,6 +397,222 @@ export default function NewOrder() {
                 onChange={handleChange}
                 className="input"
               />
+            </div>
+          </div>
+        </div>
+
+        {/* 附加属性 */}
+        <div className="card p-6">
+          <h2 className="text-lg font-semibold text-gray-900 mb-4">附加属性</h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* 箱型 */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                箱型 <span className="text-red-500">*</span>
+              </label>
+              <div className="space-y-2">
+                <label className="flex items-center">
+                  <input
+                    type="radio"
+                    name="cargoType"
+                    value="CFS"
+                    checked={formData.cargoType === 'CFS'}
+                    onChange={handleChange}
+                    className="w-4 h-4 text-primary-600 border-gray-300 focus:ring-primary-500"
+                  />
+                  <span className="ml-2 text-sm text-gray-700">拼箱 (CFS)</span>
+                </label>
+                <label className="flex items-center">
+                  <input
+                    type="radio"
+                    name="cargoType"
+                    value="FCL"
+                    checked={formData.cargoType === 'FCL'}
+                    onChange={handleChange}
+                    className="w-4 h-4 text-primary-600 border-gray-300 focus:ring-primary-500"
+                  />
+                  <span className="ml-2 text-sm text-gray-700">整箱 (FCL)</span>
+                </label>
+              </div>
+            </div>
+
+            {/* 提单 */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                提单 <span className="text-red-500">*</span>
+              </label>
+              <div className="space-y-2">
+                <label className="flex items-center">
+                  <input
+                    type="radio"
+                    name="billType"
+                    value="master"
+                    checked={formData.billType === 'master'}
+                    onChange={handleChange}
+                    className="w-4 h-4 text-primary-600 border-gray-300 focus:ring-primary-500"
+                  />
+                  <span className="ml-2 text-sm text-gray-700">船东单 (Master Bill)</span>
+                </label>
+                <label className="flex items-center">
+                  <input
+                    type="radio"
+                    name="billType"
+                    value="house"
+                    checked={formData.billType === 'house'}
+                    onChange={handleChange}
+                    className="w-4 h-4 text-primary-600 border-gray-300 focus:ring-primary-500"
+                  />
+                  <span className="ml-2 text-sm text-gray-700">货代单 (House Bill)</span>
+                </label>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* 额外服务 */}
+        <div className="card p-6">
+          <h2 className="text-lg font-semibold text-gray-900 mb-4">额外服务</h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* 异地还柜 */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                异地还柜 <span className="text-red-500">*</span>
+              </label>
+              <div className="space-y-2">
+                <label className="flex items-center">
+                  <input
+                    type="radio"
+                    name="containerReturn"
+                    value="remote"
+                    checked={formData.containerReturn === 'remote'}
+                    onChange={handleChange}
+                    className="w-4 h-4 text-primary-600 border-gray-300 focus:ring-primary-500"
+                  />
+                  <span className="ml-2 text-sm text-gray-700">异地还柜 (非Rotterdam)</span>
+                </label>
+                <label className="flex items-center">
+                  <input
+                    type="radio"
+                    name="containerReturn"
+                    value="local"
+                    checked={formData.containerReturn === 'local'}
+                    onChange={handleChange}
+                    className="w-4 h-4 text-primary-600 border-gray-300 focus:ring-primary-500"
+                  />
+                  <span className="ml-2 text-sm text-gray-700">本地还柜</span>
+                </label>
+              </div>
+            </div>
+
+            {/* 全程整柜运输 */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                全程整柜运输 <span className="text-red-500">*</span>
+              </label>
+              <div className="space-y-2">
+                <label className="flex items-center">
+                  <input
+                    type="radio"
+                    name="fullContainerDelivery"
+                    value="full"
+                    checked={formData.fullContainerDelivery === 'full'}
+                    onChange={handleChange}
+                    className="w-4 h-4 text-primary-600 border-gray-300 focus:ring-primary-500"
+                  />
+                  <span className="ml-2 text-sm text-gray-700">必须整柜派送</span>
+                </label>
+                <label className="flex items-center">
+                  <input
+                    type="radio"
+                    name="fullContainerDelivery"
+                    value="devan"
+                    checked={formData.fullContainerDelivery === 'devan'}
+                    onChange={handleChange}
+                    className="w-4 h-4 text-primary-600 border-gray-300 focus:ring-primary-500"
+                  />
+                  <span className="ml-2 text-sm text-gray-700">可拆柜后托盘送货</span>
+                </label>
+              </div>
+            </div>
+
+            {/* 末端运输方式 */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                末端运输方式 <span className="text-red-500">*</span>
+              </label>
+              <select
+                name="lastMileTransport"
+                value={formData.lastMileTransport}
+                onChange={handleChange}
+                className="input"
+              >
+                <option value="truck">卡车派送</option>
+                <option value="van">小型货车派送</option>
+                <option value="express">快递派送</option>
+                <option value="pickup">客户自提</option>
+              </select>
+            </div>
+
+            {/* 拆柜 */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                拆柜 <span className="text-red-500">*</span>
+              </label>
+              <div className="space-y-2">
+                <label className="flex items-center">
+                  <input
+                    type="radio"
+                    name="devanService"
+                    value="yes"
+                    checked={formData.devanService === 'yes'}
+                    onChange={handleChange}
+                    className="w-4 h-4 text-primary-600 border-gray-300 focus:ring-primary-500"
+                  />
+                  <span className="ml-2 text-sm text-gray-700">需要拆柜分货服务</span>
+                </label>
+                <label className="flex items-center">
+                  <input
+                    type="radio"
+                    name="devanService"
+                    value="no"
+                    checked={formData.devanService === 'no'}
+                    onChange={handleChange}
+                    className="w-4 h-4 text-primary-600 border-gray-300 focus:ring-primary-500"
+                  />
+                  <span className="ml-2 text-sm text-gray-700">不需要拆柜</span>
+                </label>
+              </div>
+            </div>
+
+            {/* 海关经停报关服务(T1报关) */}
+            <div className="md:col-span-2">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                海关经停报关服务 (T1报关) <span className="text-red-500">*</span>
+              </label>
+              <div className="flex space-x-6">
+                <label className="flex items-center">
+                  <input
+                    type="radio"
+                    name="t1CustomsService"
+                    value="yes"
+                    checked={formData.t1CustomsService === 'yes'}
+                    onChange={handleChange}
+                    className="w-4 h-4 text-primary-600 border-gray-300 focus:ring-primary-500"
+                  />
+                  <span className="ml-2 text-sm text-gray-700">是</span>
+                </label>
+                <label className="flex items-center">
+                  <input
+                    type="radio"
+                    name="t1CustomsService"
+                    value="no"
+                    checked={formData.t1CustomsService === 'no'}
+                    onChange={handleChange}
+                    className="w-4 h-4 text-primary-600 border-gray-300 focus:ring-primary-500"
+                  />
+                  <span className="ml-2 text-sm text-gray-700">否</span>
+                </label>
+              </div>
             </div>
           </div>
         </div>
