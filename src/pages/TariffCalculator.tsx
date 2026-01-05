@@ -1,8 +1,8 @@
 import { useState, useEffect, useRef } from 'react'
 import { Calculator, Package, Search, X, Info, Loader2, ChevronDown } from 'lucide-react'
 
-// API 基础地址 - 使用主系统的门户 API
-const MAIN_API_URL = import.meta.env.VITE_MAIN_API_URL || 'http://localhost:3001/api/portal'
+// API 基础地址 - 使用客户门户后端 API（代理到主系统）
+const API_URL = '/api'
 
 const currencyOptions = ['EUR', 'USD', 'CNY', 'GBP']
 
@@ -116,7 +116,7 @@ export default function TariffCalculator() {
     const fetchCountries = async () => {
       setLoadingCountries(true)
       try {
-        const response = await fetch(`${MAIN_API_URL}/base-data/countries?status=active`)
+        const response = await fetch(`${API_URL}/base-data/countries?status=active`)
         const data = await response.json()
         if (data.errCode === 200 && data.data) {
           setCountries(data.data)
@@ -140,7 +140,7 @@ export default function TariffCalculator() {
   const fetchCountryVatRate = async (countryCode: string) => {
     setLoadingVatRate(true)
     try {
-      const response = await fetch(`${MAIN_API_URL}/vat-rates/${countryCode}`)
+      const response = await fetch(`${API_URL}/vat-rates/${countryCode}`)
       const data = await response.json()
       if (data.errCode === 200 && data.data) {
         setCountryVatRate(data.data)
@@ -179,7 +179,7 @@ export default function TariffCalculator() {
     setSearching(true)
     try {
       // 可选择性地按出口国家过滤
-      let url = `${MAIN_API_URL}/tariff-rates/search?hsCode=${encodeURIComponent(keyword)}`
+      let url = `${API_URL}/tariff-rates/search?hsCode=${encodeURIComponent(keyword)}`
       if (tariffCalc.exportCountry) {
         url += `&origin=${tariffCalc.exportCountry}`
       }

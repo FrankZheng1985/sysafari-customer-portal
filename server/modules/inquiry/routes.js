@@ -153,6 +153,75 @@ router.get('/base-data/locations', async (req, res) => {
   }
 })
 
+// ==================== 关税/税率查询代理（从主系统获取） ====================
+
+/**
+ * 搜索 HS 编码税率
+ * GET /api/tariff-rates/search
+ */
+router.get('/tariff-rates/search', async (req, res) => {
+  try {
+    const { hsCode, origin, limit } = req.query
+    const mainRes = await axios.get(`${MAIN_API_URL}/api/portal/tariff-rates/search`, {
+      params: { hsCode, origin, limit },
+      headers: { 'x-api-key': MAIN_API_KEY },
+      timeout: 10000
+    })
+    res.json(mainRes.data)
+  } catch (error) {
+    console.error('搜索HS编码税率失败:', error.message)
+    res.json({ errCode: 200, msg: 'success', data: [] })
+  }
+})
+
+/**
+ * 精确查询 HS 编码税率
+ * GET /api/tariff-rates/query
+ */
+router.get('/tariff-rates/query', async (req, res) => {
+  try {
+    const { hsCode, origin } = req.query
+    const mainRes = await axios.get(`${MAIN_API_URL}/api/portal/tariff-rates/query`, {
+      params: { hsCode, origin },
+      headers: { 'x-api-key': MAIN_API_KEY },
+      timeout: 10000
+    })
+    res.json(mainRes.data)
+  } catch (error) {
+    console.error('查询HS编码税率失败:', error.message)
+    res.json({ errCode: 200, msg: 'success', data: [] })
+  }
+})
+
+/**
+ * 获取国家增值税率
+ * GET /api/vat-rates/:countryCode
+ */
+router.get('/vat-rates/:countryCode', async (req, res) => {
+  try {
+    const { countryCode } = req.params
+    const mainRes = await axios.get(`${MAIN_API_URL}/api/portal/vat-rates/${countryCode}`, {
+      headers: { 'x-api-key': MAIN_API_KEY },
+      timeout: 10000
+    })
+    res.json(mainRes.data)
+  } catch (error) {
+    console.error('获取国家增值税率失败:', error.message)
+    // 返回默认增值税率
+    res.json({
+      errCode: 200,
+      msg: 'success',
+      data: {
+        countryCode: req.params.countryCode,
+        countryName: '默认',
+        standardRate: 19,
+        reducedRate: 7,
+        isDefault: true
+      }
+    })
+  }
+})
+
 // ==================== 地址管理 ====================
 
 /**
