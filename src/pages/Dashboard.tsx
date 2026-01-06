@@ -122,7 +122,7 @@ export default function Dashboard() {
   const fetchTrend = async () => {
     try {
       const res = await portalApi.getOrderTrend({ 
-        type: trendViewType, 
+        type: 'month', 
         dateType: trendDateType 
       })
       if (res.data.errCode === 200 && res.data.data) {
