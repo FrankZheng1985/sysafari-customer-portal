@@ -158,20 +158,23 @@ router.get('/trend', authenticate, async (req, res) => {
     const startDateStr = startDate.toISOString().split('T')[0]
     
     // 根据 dateType 选择日期字段
-    const dateField = dateType === 'customs' ? 'customs_release_time' : 'created_at'
+    // 注意：create_time 是 TEXT 类型，需要转换为 timestamp
+    const dateField = dateType === 'customs' ? 'customs_release_time' : 'create_time'
+    const dateFieldCast = dateType === 'customs' ? dateField : `${dateField}::timestamp`
     
     // 按月统计订单数量
     const trendData = await db.prepare(`
       SELECT 
-        TO_CHAR(${dateField}, 'YYYY-MM') as month,
+        TO_CHAR(${dateFieldCast}, 'YYYY-MM') as month,
         COUNT(*) as count,
         COALESCE(SUM(weight), 0) as total_weight,
         COALESCE(SUM(volume), 0) as total_volume
       FROM bills_of_lading
       WHERE customer_id = $1 
         AND ${dateField} IS NOT NULL
-        AND ${dateField} >= $2
-      GROUP BY TO_CHAR(${dateField}, 'YYYY-MM')
+        AND ${dateField} != ''
+        AND ${dateFieldCast} >= $2::timestamp
+      GROUP BY TO_CHAR(${dateFieldCast}, 'YYYY-MM')
       ORDER BY month ASC
     `).all(customerId, startDateStr)
     
@@ -184,7 +187,8 @@ router.get('/trend', authenticate, async (req, res) => {
       FROM bills_of_lading
       WHERE customer_id = $1 
         AND ${dateField} IS NOT NULL
-        AND ${dateField} >= $2
+        AND ${dateField} != ''
+        AND ${dateFieldCast} >= $2::timestamp
     `).get(customerId, startDateStr)
     
     // 生成完整的12个月数据（包含无数据的月份）
