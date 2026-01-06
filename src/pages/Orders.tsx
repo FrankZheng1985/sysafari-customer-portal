@@ -410,7 +410,7 @@ export default function Orders() {
             </div>
             
             {/* 柱状图 */}
-            {trend?.months.map((item, index) => {
+            {trend?.months.map((item) => {
               const maxCount = Math.max(...(trend?.months.map(m => m.count) || [1]), 1)
               const heightPercent = maxCount > 0 ? (item.count / maxCount) * 100 : 0
               return (
