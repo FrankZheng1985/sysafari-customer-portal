@@ -10,7 +10,9 @@ import {
   AlertCircle,
   ArrowRight,
   Ship,
-  Plus
+  Plus,
+  BarChart3,
+  Calendar
 } from 'lucide-react'
 
 interface OrderStats {
@@ -28,16 +30,44 @@ interface PayableSummary {
   overdueCount: number
 }
 
+interface TrendMonth {
+  month: string
+  label: string
+  count: number
+  weight: number
+  volume: number
+}
+
+interface OrderTrend {
+  months: TrendMonth[]
+  summary: {
+    totalOrders: number
+    totalWeight: number
+    totalVolume: number
+  }
+}
+
 export default function Dashboard() {
   const { user } = useAuth()
   const [orderStats, setOrderStats] = useState<OrderStats | null>(null)
   const [payableSummary, setPayableSummary] = useState<PayableSummary | null>(null)
   const [recentOrders, setRecentOrders] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
+  
+  // 订单趋势相关状态
+  const [trend, setTrend] = useState<OrderTrend | null>(null)
+  const [trendDateType, setTrendDateType] = useState<'created' | 'customs'>('created')
+  const [trendViewType, setTrendViewType] = useState<'month' | 'year'>('month')
 
   useEffect(() => {
     fetchDashboardData()
+    fetchTrend()
   }, [])
+  
+  // 当趋势图日期类型变化时重新获取
+  useEffect(() => {
+    fetchTrend()
+  }, [trendDateType])
 
   const fetchDashboardData = async () => {
     try {
@@ -88,6 +118,20 @@ export default function Dashboard() {
       console.error('获取仪表盘数据失败:', error)
     } finally {
       setLoading(false)
+    }
+  }
+  
+  const fetchTrend = async () => {
+    try {
+      const res = await portalApi.getOrderTrend({ 
+        type: trendViewType, 
+        dateType: trendDateType 
+      })
+      if (res.data.errCode === 200 && res.data.data) {
+        setTrend(res.data.data)
+      }
+    } catch (error) {
+      console.error('获取订单趋势失败:', error)
     }
   }
 
@@ -178,6 +222,148 @@ export default function Dashboard() {
             <div className="w-10 h-10 bg-red-50 rounded-lg flex items-center justify-center">
               <AlertCircle className="w-5 h-5 text-red-600" />
             </div>
+          </div>
+        </div>
+      </div>
+
+      {/* 订单量趋势图表 */}
+      <div className="bg-white rounded-lg border border-gray-200 p-5">
+        <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center gap-2">
+            <BarChart3 className="w-5 h-5 text-gray-500" />
+            <span className="text-sm font-medium text-gray-700">订单量趋势</span>
+          </div>
+          <div className="flex items-center gap-2">
+            {/* 统计类型切换 */}
+            <div className="flex bg-gray-100 rounded-lg p-0.5">
+              <button
+                onClick={() => setTrendDateType('created')}
+                className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all ${
+                  trendDateType === 'created'
+                    ? 'bg-white text-primary-600 shadow-sm'
+                    : 'text-gray-500 hover:text-gray-700'
+                }`}
+              >
+                创建时间
+              </button>
+              <button
+                onClick={() => setTrendDateType('customs')}
+                className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all ${
+                  trendDateType === 'customs'
+                    ? 'bg-white text-primary-600 shadow-sm'
+                    : 'text-gray-500 hover:text-gray-700'
+                }`}
+              >
+                清关完成
+              </button>
+            </div>
+            {/* 月/年切换 */}
+            <div className="flex items-center gap-1 bg-gray-100 rounded-lg p-0.5">
+              <button
+                onClick={() => setTrendViewType('month')}
+                className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all flex items-center gap-1 ${
+                  trendViewType === 'month'
+                    ? 'bg-white text-primary-600 shadow-sm'
+                    : 'text-gray-500 hover:text-gray-700'
+                }`}
+              >
+                <Calendar className="w-3.5 h-3.5" />
+                月
+              </button>
+              <button
+                onClick={() => setTrendViewType('year')}
+                className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all flex items-center gap-1 ${
+                  trendViewType === 'year'
+                    ? 'bg-white text-primary-600 shadow-sm'
+                    : 'text-gray-500 hover:text-gray-700'
+                }`}
+              >
+                <Calendar className="w-3.5 h-3.5" />
+                年
+              </button>
+            </div>
+          </div>
+        </div>
+        
+        {/* 柱状图 */}
+        <div className="relative">
+          {/* Y轴刻度 */}
+          <div className="absolute left-0 top-0 h-48 flex flex-col justify-between text-xs text-gray-400 pr-2">
+            {(() => {
+              const maxCount = trend ? Math.max(...trend.months.map(m => m.count), 1) : 40
+              const step = Math.ceil(maxCount / 4)
+              return [step * 4, step * 3, step * 2, step, 0].map((val, idx) => (
+                <span key={idx} className="text-right w-6">{val}</span>
+              ))
+            })()}
+          </div>
+          
+          {/* 图表区域 */}
+          <div className="ml-8 h-48 flex items-end gap-2 border-b border-gray-100 relative">
+            {/* 水平网格线 */}
+            <div className="absolute inset-0 flex flex-col justify-between pointer-events-none">
+              {[0, 1, 2, 3, 4].map(i => (
+                <div key={i} className="border-t border-dashed border-gray-100 w-full" />
+              ))}
+            </div>
+            
+            {/* 柱状图 */}
+            {trend?.months.map((item) => {
+              const maxCount = Math.max(...(trend?.months.map(m => m.count) || [1]), 1)
+              const heightPercent = maxCount > 0 ? (item.count / maxCount) * 100 : 0
+              return (
+                <div key={item.month} className="flex-1 flex flex-col items-center justify-end relative group">
+                  {/* 柱子 */}
+                  <div
+                    className="w-full max-w-10 bg-primary-500 rounded-t-sm transition-all duration-300 hover:bg-primary-600 cursor-pointer relative"
+                    style={{ 
+                      height: heightPercent > 0 ? `${Math.max(heightPercent, 4)}%` : '2px',
+                      minHeight: item.count > 0 ? '8px' : '2px'
+                    }}
+                  >
+                    {/* 始终显示的数值 */}
+                    {item.count > 0 && (
+                      <span className="absolute -top-5 left-1/2 -translate-x-1/2 text-xs font-semibold text-primary-600 whitespace-nowrap">
+                        {item.count}
+                      </span>
+                    )}
+                  </div>
+                  {/* 悬浮提示 */}
+                  <div className="absolute bottom-full mb-8 bg-gray-800 text-white text-xs rounded-lg px-3 py-2 opacity-0 group-hover:opacity-100 transition-opacity z-10 pointer-events-none whitespace-nowrap shadow-lg">
+                    <div className="font-medium mb-1">{item.month}</div>
+                    <div>订单数: {item.count}</div>
+                    <div>重量: {item.weight.toLocaleString()} KG</div>
+                    <div>体积: {item.volume.toFixed(2)} CBM</div>
+                    <div className="absolute bottom-0 left-1/2 -translate-x-1/2 translate-y-full w-0 h-0 border-x-4 border-x-transparent border-t-4 border-t-gray-800"></div>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+          
+          {/* X轴标签 */}
+          <div className="ml-8 flex gap-2 mt-2">
+            {trend?.months.map(item => (
+              <div key={item.month} className="flex-1 text-center text-xs text-gray-400">
+                {item.label}
+              </div>
+            ))}
+          </div>
+        </div>
+        
+        {/* 汇总数据 */}
+        <div className="flex justify-around mt-6 pt-4 border-t border-gray-100">
+          <div className="text-center">
+            <p className="text-2xl font-bold text-gray-900">{trend?.summary.totalOrders || 0}</p>
+            <p className="text-xs text-gray-500 mt-1">近12月订单</p>
+          </div>
+          <div className="text-center">
+            <p className="text-2xl font-bold text-gray-900">{(trend?.summary.totalWeight || 0).toLocaleString()}</p>
+            <p className="text-xs text-gray-500 mt-1">累计重量(KG)</p>
+          </div>
+          <div className="text-center">
+            <p className="text-2xl font-bold text-gray-900">{(trend?.summary.totalVolume || 0).toFixed(1)}</p>
+            <p className="text-xs text-gray-500 mt-1">累计体积(CBM)</p>
           </div>
         </div>
       </div>
