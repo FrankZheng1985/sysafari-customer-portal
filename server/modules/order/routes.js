@@ -142,6 +142,115 @@ router.get('/stats', authenticate, async (req, res) => {
 })
 
 /**
+ * 获取订单量趋势
+ * GET /api/orders/trend
+ * 返回近12个月的订单量趋势数据（按创建时间或清关完成时间统计）
+ */
+router.get('/trend', authenticate, async (req, res) => {
+  try {
+    const db = getDatabase()
+    const customerId = req.customer.customerId
+    const { type = 'month', dateType = 'created' } = req.query
+    
+    // 计算日期范围（近12个月）
+    const now = new Date()
+    const startDate = new Date(now.getFullYear(), now.getMonth() - 11, 1)
+    const startDateStr = startDate.toISOString().split('T')[0]
+    
+    // 根据 dateType 选择日期字段
+    const dateField = dateType === 'customs' ? 'customs_release_time' : 'created_at'
+    
+    // 按月统计订单数量
+    const trendData = await db.prepare(`
+      SELECT 
+        TO_CHAR(${dateField}, 'YYYY-MM') as month,
+        COUNT(*) as count,
+        COALESCE(SUM(weight), 0) as total_weight,
+        COALESCE(SUM(volume), 0) as total_volume
+      FROM bills_of_lading
+      WHERE customer_id = $1 
+        AND ${dateField} IS NOT NULL
+        AND ${dateField} >= $2
+      GROUP BY TO_CHAR(${dateField}, 'YYYY-MM')
+      ORDER BY month ASC
+    `).all(customerId, startDateStr)
+    
+    // 获取近12个月的汇总数据
+    const summaryStats = await db.prepare(`
+      SELECT 
+        COUNT(*) as total_orders,
+        COALESCE(SUM(weight), 0) as total_weight,
+        COALESCE(SUM(volume), 0) as total_volume
+      FROM bills_of_lading
+      WHERE customer_id = $1 
+        AND ${dateField} IS NOT NULL
+        AND ${dateField} >= $2
+    `).get(customerId, startDateStr)
+    
+    // 生成完整的12个月数据（包含无数据的月份）
+    const months = []
+    for (let i = 0; i < 12; i++) {
+      const date = new Date(now.getFullYear(), now.getMonth() - 11 + i, 1)
+      const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`
+      const monthLabel = `${String(date.getMonth() + 1).padStart(2, '0')}`
+      
+      const found = trendData?.find(d => d.month === monthKey)
+      months.push({
+        month: monthKey,
+        label: monthLabel,
+        count: parseInt(found?.count || 0),
+        weight: parseFloat(found?.total_weight || 0),
+        volume: parseFloat(found?.total_volume || 0)
+      })
+    }
+    
+    res.json({
+      errCode: 200,
+      msg: 'success',
+      data: {
+        months,
+        summary: {
+          totalOrders: parseInt(summaryStats?.total_orders || 0),
+          totalWeight: parseFloat(summaryStats?.total_weight || 0),
+          totalVolume: parseFloat(summaryStats?.total_volume || 0)
+        }
+      }
+    })
+    
+  } catch (error) {
+    console.error('获取订单趋势失败:', error.message)
+    
+    // 返回空数据
+    const now = new Date()
+    const emptyMonths = []
+    for (let i = 0; i < 12; i++) {
+      const date = new Date(now.getFullYear(), now.getMonth() - 11 + i, 1)
+      const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`
+      emptyMonths.push({
+        month: monthKey,
+        label: `${String(date.getMonth() + 1).padStart(2, '0')}`,
+        count: 0,
+        weight: 0,
+        volume: 0
+      })
+    }
+    
+    res.json({
+      errCode: 200,
+      msg: 'success',
+      data: {
+        months: emptyMonths,
+        summary: {
+          totalOrders: 0,
+          totalWeight: 0,
+          totalVolume: 0
+        }
+      }
+    })
+  }
+})
+
+/**
  * 获取港口选项列表
  * GET /api/orders/ports
  * 返回当前客户订单中所有唯一的起运港和目的港
