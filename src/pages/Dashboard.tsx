@@ -288,7 +288,7 @@ export default function Dashboard() {
         {/* 柱状图 */}
         <div className="relative">
           {/* Y轴刻度 */}
-          <div className="absolute left-0 top-0 h-48 flex flex-col justify-between text-xs text-gray-400 pr-2">
+          <div className="absolute left-0 top-0 h-52 flex flex-col justify-between text-xs text-gray-400 pr-2">
             {(() => {
               const maxCount = trend ? Math.max(...trend.months.map(m => m.count), 1) : 40
               const step = Math.ceil(maxCount / 4)
@@ -299,7 +299,7 @@ export default function Dashboard() {
           </div>
           
           {/* 图表区域 */}
-          <div className="ml-8 h-48 flex items-end gap-2 border-b border-gray-100 relative">
+          <div className="ml-8 h-52 flex items-end gap-1.5 border-b border-gray-200 relative">
             {/* 水平网格线 */}
             <div className="absolute inset-0 flex flex-col justify-between pointer-events-none">
               {[0, 1, 2, 3, 4].map(i => (
@@ -311,19 +311,35 @@ export default function Dashboard() {
             {trend?.months.map((item) => {
               const maxCount = Math.max(...(trend?.months.map(m => m.count) || [1]), 1)
               const heightPercent = maxCount > 0 ? (item.count / maxCount) * 100 : 0
+              // 根据数值比例计算颜色深浅：低值浅色，高值深色
+              const colorIntensity = maxCount > 0 ? Math.max(0.3, item.count / maxCount) : 0.3
+              const isHighValue = heightPercent >= 70  // 高于70%为高值
+              const isMediumValue = heightPercent >= 40 && heightPercent < 70  // 40-70%为中值
+              
               return (
                 <div key={item.month} className="flex-1 flex flex-col items-center justify-end relative group">
-                  {/* 柱子 */}
+                  {/* 柱子 - 根据高低使用不同颜色 */}
                   <div
-                    className="w-full max-w-10 bg-primary-500 rounded-t-sm transition-all duration-300 hover:bg-primary-600 cursor-pointer relative"
+                    className={`w-full max-w-8 rounded-t transition-all duration-300 cursor-pointer relative shadow-sm ${
+                      item.count === 0 
+                        ? 'bg-gray-200' 
+                        : isHighValue 
+                          ? 'bg-primary-600 hover:bg-primary-700' 
+                          : isMediumValue 
+                            ? 'bg-primary-500 hover:bg-primary-600' 
+                            : 'bg-primary-400 hover:bg-primary-500'
+                    }`}
                     style={{ 
-                      height: heightPercent > 0 ? `${Math.max(heightPercent, 4)}%` : '2px',
-                      minHeight: item.count > 0 ? '8px' : '2px'
+                      height: heightPercent > 0 ? `${Math.max(heightPercent, 6)}%` : '3px',
+                      minHeight: item.count > 0 ? '12px' : '3px',
+                      opacity: item.count > 0 ? colorIntensity + 0.4 : 0.5
                     }}
                   >
                     {/* 始终显示的数值 */}
                     {item.count > 0 && (
-                      <span className="absolute -top-5 left-1/2 -translate-x-1/2 text-xs font-semibold text-primary-600 whitespace-nowrap">
+                      <span className={`absolute -top-5 left-1/2 -translate-x-1/2 text-xs font-bold whitespace-nowrap ${
+                        isHighValue ? 'text-primary-700' : isMediumValue ? 'text-primary-600' : 'text-primary-500'
+                      }`}>
                         {item.count}
                       </span>
                     )}
@@ -342,7 +358,7 @@ export default function Dashboard() {
           </div>
           
           {/* X轴标签 */}
-          <div className="ml-8 flex gap-2 mt-2">
+          <div className="ml-8 flex gap-1.5 mt-2">
             {trend?.months.map(item => (
               <div key={item.month} className="flex-1 text-center text-xs text-gray-400">
                 {item.label}
