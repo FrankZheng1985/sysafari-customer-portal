@@ -112,9 +112,9 @@ export const portalApi = {
   
   getOrderStats: () => mainApi.get('/orders/stats'),
   
-  // 获取订单量趋势
+  // 获取订单量趋势（使用门户后端API）
   getOrderTrend: (params?: { type?: 'month' | 'year'; dateType?: 'created' | 'customs' }) => 
-    mainApi.get('/orders/trend', { params }),
+    api.get('/orders/trend', { params }),
   
   // 获取港口选项
   getPorts: () => mainApi.get('/orders/ports'),
