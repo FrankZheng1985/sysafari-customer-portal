@@ -195,7 +195,7 @@ router.get('/ports', authenticate, async (req, res) => {
  */
 router.get('/', authenticate, async (req, res) => {
   try {
-    const { page = 1, pageSize = 20, status, keyword, startDate, endDate, shipStatus, customsStatus, deliveryStatus, progressStatus, billNumber, etdStart, etdEnd, etaStart, etaEnd, portOfLoading, portOfDischarge } = req.query
+    const { page = 1, pageSize = 20, status, keyword, startDate, endDate, shipStatus, customsStatus, deliveryStatus, progressStatus, billNumber, etdStart, etdEnd, etaStart, etaEnd, portOfLoading, portOfDischarge, sortField, sortOrder } = req.query
     const db = getDatabase()
     const customerId = req.customer.customerId
     
@@ -296,6 +296,19 @@ router.get('/', authenticate, async (req, res) => {
       SELECT COUNT(*) as total FROM bills_of_lading ${whereClause}
     `).get(...conditions)
     
+    // 构建排序子句 - 支持 etd 和 eta 排序
+    let orderByClause = 'ORDER BY created_at DESC' // 默认排序
+    const allowedSortFields = ['etd', 'eta', 'created_at']
+    const allowedSortOrders = ['asc', 'desc', 'ASC', 'DESC']
+    
+    if (sortField && allowedSortFields.includes(sortField)) {
+      const order = (sortOrder && allowedSortOrders.includes(sortOrder)) 
+        ? sortOrder.toUpperCase() 
+        : 'DESC'
+      // NULL 值排在最后
+      orderByClause = `ORDER BY ${sortField} IS NULL, ${sortField} ${order}`
+    }
+    
     // 获取订单列表
     const ordersRaw = await db.prepare(`
       SELECT 
@@ -309,7 +322,7 @@ router.get('/', authenticate, async (req, res) => {
         created_at, updated_at
       FROM bills_of_lading
       ${whereClause}
-      ORDER BY created_at DESC
+      ${orderByClause}
       LIMIT $${paramIndex++} OFFSET $${paramIndex}
     `).all(...conditions, parseInt(pageSize), offset)
     

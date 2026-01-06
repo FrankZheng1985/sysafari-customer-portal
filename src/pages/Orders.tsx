@@ -9,7 +9,10 @@ import {
   Eye,
   ChevronDown,
   ChevronUp,
-  X
+  X,
+  ArrowUp,
+  ArrowDown,
+  ArrowUpDown
 } from 'lucide-react'
 import DateInput from '../components/DatePicker'
 
@@ -65,6 +68,10 @@ export default function Orders() {
   const [loadingPorts, setLoadingPorts] = useState<string[]>([])
   const [dischargePorts, setDischargePorts] = useState<string[]>([])
   
+  // 排序状态
+  const [sortField, setSortField] = useState<'etd' | 'eta' | ''>('')
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc')
+  
   // 可选的每页条数
   const pageSizeOptions = [10, 20, 50, 100]
   
@@ -78,7 +85,7 @@ export default function Orders() {
 
   useEffect(() => {
     fetchOrders()
-  }, [page, statusFilter, activeTab, currentPageSize])
+  }, [page, statusFilter, activeTab, currentPageSize, sortField, sortOrder])
 
   const fetchStats = async () => {
     try {
@@ -118,7 +125,10 @@ export default function Orders() {
         etaEnd: etaEnd || undefined,
         // 港口筛选
         portOfLoading: portOfLoading || undefined,
-        portOfDischarge: portOfDischarge || undefined
+        portOfDischarge: portOfDischarge || undefined,
+        // 排序参数
+        sortField: sortField || undefined,
+        sortOrder: sortField ? sortOrder : undefined
       }
       
       // 设置状态筛选
@@ -218,6 +228,29 @@ export default function Orders() {
   const handlePageSizeChange = (newSize: number) => {
     setCurrentPageSize(newSize)
     setPage(1)
+  }
+
+  // 处理排序点击
+  const handleSort = (field: 'etd' | 'eta') => {
+    if (sortField === field) {
+      // 已选中此字段，切换排序顺序
+      setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')
+    } else {
+      // 选择新字段，默认降序（最新的在前）
+      setSortField(field)
+      setSortOrder('desc')
+    }
+    setPage(1)
+  }
+
+  // 获取排序图标
+  const getSortIcon = (field: 'etd' | 'eta') => {
+    if (sortField !== field) {
+      return <ArrowUpDown className="w-3.5 h-3.5 text-gray-400" />
+    }
+    return sortOrder === 'asc' 
+      ? <ArrowUp className="w-3.5 h-3.5 text-primary-600" />
+      : <ArrowDown className="w-3.5 h-3.5 text-primary-600" />
   }
 
   // 带 tooltip 的单元格组件（使用原生 title 属性，更稳定）
@@ -457,8 +490,24 @@ export default function Orders() {
                     <th>柜号</th>
                     <th>起运港</th>
                     <th>目的港</th>
-                    <th>ETD</th>
-                    <th>ETA</th>
+                    <th>
+                      <button
+                        onClick={() => handleSort('etd')}
+                        className={`inline-flex items-center gap-1 hover:text-primary-600 transition-colors ${sortField === 'etd' ? 'text-primary-600' : ''}`}
+                      >
+                        ETD
+                        {getSortIcon('etd')}
+                      </button>
+                    </th>
+                    <th>
+                      <button
+                        onClick={() => handleSort('eta')}
+                        className={`inline-flex items-center gap-1 hover:text-primary-600 transition-colors ${sortField === 'eta' ? 'text-primary-600' : ''}`}
+                      >
+                        ETA
+                        {getSortIcon('eta')}
+                      </button>
+                    </th>
                     <th className="text-center">状态</th>
                     <th className="text-center">操作</th>
                   </tr>
