@@ -635,46 +635,148 @@ router.get('/truck-types/recommend', authenticate, async (req, res) => {
 /**
  * 运输计算
  * POST /api/transport/calculate
+ * 调用主系统的 HERE Routing API 获取真实路线距离
  */
 router.post('/transport/calculate', authenticate, async (req, res) => {
   try {
-    const { origin, destination, waypoints, truckType, weight, volume } = req.body
+    const { origin, destination, waypoints, truckTypeCode, goods } = req.body
     
     if (!origin?.address || !destination?.address) {
       return res.status(400).json({ errCode: 400, msg: '缺少起点或终点地址', data: null })
     }
     
-    // 简化计算：估算距离和费用
-    // 实际生产环境应调用 HERE API 或 Google Maps API
-    const estimatedDistance = 500 + Math.random() * 1000 // 500-1500 km
-    const estimatedDuration = estimatedDistance / 70 // 按平均 70 km/h 计算
+    console.log('[运输计算] 请求参数:', { origin, destination, waypoints, truckTypeCode, goods })
     
-    const baseRate = truckType?.baseRatePerKm || 1.5
-    const baseCost = estimatedDistance * baseRate
-    const fuelSurcharge = baseCost * 0.15
-    const tolls = estimatedDistance * 0.12
-    const totalCost = baseCost + fuelSurcharge + tolls
+    // 调用主系统的路线计算 API（使用 HERE Routing API）
+    let routeData = null
+    let useEstimate = false
+    
+    try {
+      // 获取当前用户的客户ID（用于主系统认证）
+      const customerId = req.user?.customerId || req.body.customerId || 'portal-guest'
+      
+      const mainApiRes = await axios.post(`${MAIN_API_URL}/api/portal/transport/calculate`, {
+        origin: { address: origin.address || origin },  // 确保是对象格式
+        destination: { address: destination.address || destination },  // 确保是对象格式
+        waypoints: (waypoints || []).map(wp => ({ address: wp.address || wp })).filter(w => w.address),
+        truckTypeCode: truckTypeCode || 'SEMI_40',
+        goods: goods || {}
+      }, {
+        headers: {
+          'x-api-key': MAIN_API_KEY,
+          'x-portal-customer': customerId,
+          'Content-Type': 'application/json'
+        },
+        timeout: 15000 // 15秒超时
+      })
+      
+      console.log('[运输计算] 主系统响应:', mainApiRes.data)
+      
+      if (mainApiRes.data.errCode === 200 && mainApiRes.data.data) {
+        routeData = mainApiRes.data.data
+      } else {
+        console.warn('[运输计算] 主系统返回错误:', mainApiRes.data.msg)
+        useEstimate = true
+      }
+    } catch (apiError) {
+      console.error('[运输计算] 主系统 API 调用失败:', apiError.message)
+      if (apiError.response) {
+        console.error('[运输计算] 响应状态:', apiError.response.status)
+        console.error('[运输计算] 响应数据:', apiError.response.data)
+      }
+      useEstimate = true
+    }
+    
+    // 如果主系统 API 调用失败，使用本地估算（带警告）
+    if (useEstimate || !routeData) {
+      console.warn('[运输计算] 使用本地估算，无法获取真实路线')
+      
+      // 本地估算逻辑（作为后备方案）
+      // 注意：这只是估算，不够准确
+      const estimatedDistance = 800 + Math.random() * 800 // 800-1600 km
+      const estimatedDuration = estimatedDistance / 70 // 按平均 70 km/h 计算
+      
+      // 获取卡车类型费率
+      const db = getDatabase()
+      let truckType = null
+      if (truckTypeCode) {
+        truckType = await db.prepare(`
+          SELECT code, name, base_rate_per_km, min_charge 
+          FROM truck_types 
+          WHERE code = $1 AND status = 'active'
+        `).get(truckTypeCode)
+      }
+      
+      const baseRate = truckType?.base_rate_per_km || 1.5
+      const minCharge = truckType?.min_charge || 150
+      
+      const baseCost = Math.max(estimatedDistance * baseRate, minCharge)
+      const fuelSurcharge = baseCost * 0.15
+      const tolls = estimatedDistance * 0.12
+      const totalCost = baseCost + fuelSurcharge + tolls
+      
+      return res.json({
+        errCode: 200,
+        msg: 'success',
+        data: {
+          route: {
+            distance: Math.round(estimatedDistance),
+            duration: Math.round(estimatedDuration * 60),
+            durationFormatted: `${Math.floor(estimatedDuration)}小时${Math.round((estimatedDuration % 1) * 60)}分钟`
+          },
+          cost: {
+            baseCost: Math.round(baseCost * 100) / 100,
+            transportCost: Math.round(baseCost * 100) / 100,
+            tolls: Math.round(tolls * 100) / 100,
+            fuelSurcharge: Math.round(fuelSurcharge * 100) / 100,
+            totalCost: Math.round(totalCost * 100) / 100
+          },
+          truckType: {
+            code: truckType?.code || 'TRUCK_18T',
+            name: truckType?.name || '18吨卡车'
+          },
+          isEstimate: true,
+          warning: '无法获取精确路线，当前为估算值，仅供参考'
+        }
+      })
+    }
+    
+    // 使用主系统返回的真实路线数据
+    // 主系统返回格式：{ route: { route: { roadDistance, duration, durationFormatted, ... }, origin, destination }, cost: { ... }, truckType: { ... } }
+    // 注意：路线数据可能在 routeData.route.route 或直接在 routeData.route 中
+    // 重要：主系统返回的 duration 单位是分钟，不是秒！
+    const routeInfo = routeData.route?.route || routeData.route || {}
+    const distance = routeInfo.roadDistance || routeInfo.distance || 0
+    const durationMinutes = routeInfo.duration || 0 // 分钟
+    const durationHours = durationMinutes / 60
+    
+    // 优先使用主系统返回的格式化时间，否则自己计算
+    const durationFormatted = routeInfo.durationFormatted || (durationMinutes > 0 
+      ? `${Math.floor(durationHours)}小时${Math.round((durationHours % 1) * 60)}分钟`
+      : `${Math.floor(distance / 70)}小时${Math.round(((distance / 70) % 1) * 60)}分钟`) // 按70km/h估算
     
     res.json({
       errCode: 200,
       msg: 'success',
       data: {
         route: {
-          distance: Math.round(estimatedDistance),
-          duration: Math.round(estimatedDuration * 60), // 分钟
-          durationFormatted: `${Math.floor(estimatedDuration)}小时${Math.round((estimatedDuration % 1) * 60)}分钟`
+          distance: Math.round(distance),
+          duration: durationMinutes || Math.round(distance / 70 * 60), // 分钟
+          durationFormatted: durationFormatted
         },
         cost: {
-          baseCost: Math.round(baseCost * 100) / 100,
-          transportCost: Math.round(baseCost * 100) / 100,
-          tolls: Math.round(tolls * 100) / 100,
-          fuelSurcharge: Math.round(fuelSurcharge * 100) / 100,
-          totalCost: Math.round(totalCost * 100) / 100
+          baseCost: routeData.cost?.baseCost || 0,
+          transportCost: routeData.cost?.transportCost || 0,
+          tolls: routeData.cost?.tolls || 0,
+          fuelSurcharge: routeData.cost?.fuelSurcharge || 0,
+          totalCost: routeData.cost?.totalCost || 0,
+          currency: routeData.cost?.currency || 'EUR'
         },
         truckType: {
-          code: truckType?.code || 'TRUCK_18T',
-          name: truckType?.name || '18吨卡车'
-        }
+          code: routeData.truckType?.code || truckTypeCode || 'SEMI_40',
+          name: routeData.truckType?.name || '标准半挂车'
+        },
+        isEstimate: false
       }
     })
   } catch (error) {

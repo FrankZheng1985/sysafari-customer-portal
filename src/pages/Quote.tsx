@@ -58,6 +58,8 @@ interface TransportQuote {
     code: string
     name: string
   }
+  isEstimate?: boolean
+  warning?: string
 }
 
 interface Inquiry {
@@ -981,14 +983,34 @@ export default function Quote() {
                 {/* 路线信息 */}
                 <div className="bg-white rounded-lg shadow-sm border p-6">
                   <h3 className="text-lg font-medium text-gray-900 mb-4">路线信息</h3>
+                  
+                  {/* 估算警告提示 */}
+                  {transportQuote.isEstimate && (
+                    <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                      <div className="flex items-start">
+                        <AlertCircle className="w-5 h-5 text-yellow-500 mr-2 flex-shrink-0 mt-0.5" />
+                        <div className="text-sm text-yellow-700">
+                          <p className="font-medium">估算数据</p>
+                          <p>{transportQuote.warning || '当前为系统估算值，实际路线距离可能有所不同'}</p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                  
                   <div className="space-y-3">
                     <div className="flex justify-between">
                       <span className="text-gray-500">总距离</span>
-                      <span className="font-medium">{transportQuote.route.distance} km</span>
+                      <span className="font-medium">
+                        {transportQuote.route.distance} km
+                        {transportQuote.isEstimate && <span className="text-yellow-500 text-xs ml-1">*估算</span>}
+                      </span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-gray-500">预计行程时间</span>
-                      <span className="font-medium">{transportQuote.route.durationFormatted}</span>
+                      <span className="font-medium">
+                        {transportQuote.route.durationFormatted}
+                        {transportQuote.isEstimate && <span className="text-yellow-500 text-xs ml-1">*估算</span>}
+                      </span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-gray-500">卡车类型</span>
