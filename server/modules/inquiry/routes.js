@@ -162,14 +162,30 @@ router.get('/base-data/locations', async (req, res) => {
 router.get('/tariff-rates/search', async (req, res) => {
   try {
     const { hsCode, origin, limit } = req.query
+    console.log(`[税率搜索] 请求参数: hsCode=${hsCode}, origin=${origin}, limit=${limit}`)
+    console.log(`[税率搜索] 调用主系统: ${MAIN_API_URL}/api/portal/tariff-rates/search`)
+    
     const mainRes = await axios.get(`${MAIN_API_URL}/api/portal/tariff-rates/search`, {
       params: { hsCode, origin, limit },
       headers: { 'x-api-key': MAIN_API_KEY },
       timeout: 10000
     })
+    
+    // 调试：打印返回的数据
+    const resultCount = mainRes.data?.data?.length || 0
+    console.log(`[税率搜索] 主系统返回 ${resultCount} 条记录`)
+    if (mainRes.data?.data && mainRes.data.data.length > 0) {
+      mainRes.data.data.forEach((rate, idx) => {
+        console.log(`[税率搜索] 结果${idx + 1}: hsCode=${rate.hsCode}, hsCode10=${rate.hsCode10}, dutyRate=${rate.dutyRate}%`)
+      })
+    }
+    
     res.json(mainRes.data)
   } catch (error) {
     console.error('搜索HS编码税率失败:', error.message)
+    if (error.response) {
+      console.error('主系统响应:', error.response.status, error.response.data)
+    }
     res.json({ errCode: 200, msg: 'success', data: [] })
   }
 })

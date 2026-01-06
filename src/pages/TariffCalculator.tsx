@@ -232,26 +232,47 @@ export default function TariffCalculator() {
       if (tariffCalc.exportCountry) {
         url += `&origin=${tariffCalc.exportCountry}`
       }
+      console.log('[关税计算器] 搜索HS编码:', keyword, '出口国:', tariffCalc.exportCountry)
+      
       const response = await fetch(url)
       const data = await response.json()
+      console.log('[关税计算器] API返回:', data)
+      
       if (data.errCode === 200 && data.data) {
         const results = data.data as TariffRate[]
         setSearchResults(results)
         
+        console.log('[关税计算器] 搜索结果数量:', results.length)
+        results.forEach((r, i) => {
+          console.log(`[关税计算器] 结果${i + 1}: hsCode=${r.hsCode}, hsCode10=${r.hsCode10}, dutyRate=${r.dutyRate}%`)
+        })
+        
         // 检查是否有精确匹配的HS编码（8位或10位）
+        // 同时检查 originalHsCode 字段（原始查询编码）
         const exactMatch = results.find(
-          (rate) => rate.hsCode === keyword || rate.hsCode10 === keyword
+          (rate) => rate.hsCode === keyword || 
+                    rate.hsCode10 === keyword ||
+                    (rate as TariffRate & { originalHsCode?: string }).originalHsCode === keyword
         )
         
         if (exactMatch) {
           // 精确匹配时自动选择
+          console.log('[关税计算器] 找到精确匹配:', exactMatch.hsCode, exactMatch.hsCode10)
           setSelectedRate(exactMatch)
           setShowDropdown(false)
           setTariffResult(null) // 清除之前的计算结果
+        } else if (results.length === 1) {
+          // 只有一个结果时，自动选择（模糊匹配场景）
+          console.log('[关税计算器] 只有一个结果，自动选择:', results[0].hsCode)
+          setSelectedRate(results[0])
+          setShowDropdown(false)
+          setTariffResult(null)
         } else if (results.length > 0) {
           // 有搜索结果但没有精确匹配，显示下拉框让用户选择
+          console.log('[关税计算器] 多个结果，显示下拉框供选择')
           setShowDropdown(true)
         } else {
+          console.log('[关税计算器] 无搜索结果')
           setShowDropdown(false)
         }
       }
