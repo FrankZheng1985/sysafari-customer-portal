@@ -220,24 +220,17 @@ export default function Orders() {
     setPage(1)
   }
 
-  // 带 tooltip 的单元格组件
+  // 带 tooltip 的单元格组件（使用原生 title 属性，更稳定）
   const TruncatedCell = ({ value, maxWidth = 120 }: { value: string | null | undefined, maxWidth?: number }) => {
     if (!value) return <span className="text-gray-400">-</span>
     return (
-      <div className="relative group">
-        <span 
-          className="block truncate text-gray-700" 
-          style={{ maxWidth: `${maxWidth}px` }}
-        >
-          {value}
-        </span>
-        {value.length > 10 && (
-          <div className="absolute left-0 bottom-full mb-2 px-3 py-2 bg-gray-900 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50 whitespace-nowrap">
-            {value}
-            <div className="absolute left-4 top-full w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-gray-900"></div>
-          </div>
-        )}
-      </div>
+      <span 
+        className="block truncate text-gray-700 cursor-default" 
+        style={{ maxWidth: `${maxWidth}px` }}
+        title={value.length > 10 ? value : undefined}
+      >
+        {value}
+      </span>
     )
   }
 
