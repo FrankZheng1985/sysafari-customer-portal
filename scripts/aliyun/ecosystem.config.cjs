@@ -3,12 +3,31 @@
  * 客户门户系统 - 端口 3003
  */
 
+const fs = require('fs')
 const path = require('path')
 
-// 加载 .env 文件
-require('dotenv').config({ 
-  path: path.join('/var/www/sysafari-customer-portal/server', '.env') 
-})
+// 手动读取并解析 .env 文件
+function loadEnvFile(envPath) {
+  try {
+    const envContent = fs.readFileSync(envPath, 'utf8')
+    const envVars = {}
+    envContent.split('\n').forEach(line => {
+      const trimmed = line.trim()
+      if (trimmed && !trimmed.startsWith('#')) {
+        const [key, ...valueParts] = trimmed.split('=')
+        if (key && valueParts.length > 0) {
+          envVars[key.trim()] = valueParts.join('=').trim()
+        }
+      }
+    })
+    return envVars
+  } catch (err) {
+    console.error('无法读取 .env 文件:', err.message)
+    return {}
+  }
+}
+
+const envVars = loadEnvFile('/var/www/sysafari-customer-portal/server/.env')
 
 module.exports = {
   apps: [{
@@ -21,10 +40,10 @@ module.exports = {
     max_memory_restart: '500M',
     env: {
       NODE_ENV: 'production',
-      PORT: process.env.PORT || 3003,
-      DATABASE_URL: process.env.DATABASE_URL,
-      MAIN_API_URL: process.env.MAIN_API_URL || 'http://localhost:3001',
-      MAIN_API_KEY: process.env.MAIN_API_KEY || ''
+      PORT: envVars.PORT || 3003,
+      DATABASE_URL: envVars.DATABASE_URL,
+      MAIN_API_URL: envVars.MAIN_API_URL || 'http://localhost:3001',
+      MAIN_API_KEY: envVars.MAIN_API_KEY || ''
     },
     error_file: '/var/www/sysafari-customer-portal/logs/error.log',
     out_file: '/var/www/sysafari-customer-portal/logs/out.log',
