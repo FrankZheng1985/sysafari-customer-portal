@@ -15,21 +15,23 @@ import {
   ChevronDown,
   User,
   Bell,
-  Calculator
+  Calculator,
+  Users
 } from 'lucide-react'
 
 const navigation = [
-  { name: '仪表盘', href: '/', icon: LayoutDashboard },
-  { name: '订单管理', href: '/orders', icon: Package },
-  { name: '在线询价', href: '/quote', icon: Calculator },
-  { name: '关税计算', href: '/tariff-calculator', icon: Calculator },
-  { name: '账单查询', href: '/invoices', icon: FileText },
-  { name: '应付账款', href: '/payables', icon: CreditCard },
-  { name: 'API 文档', href: '/api-docs', icon: Book },
+  { name: '仪表盘', href: '/', icon: LayoutDashboard, permission: null },
+  { name: '订单管理', href: '/orders', icon: Package, permission: 'orders:view' },
+  { name: '在线询价', href: '/quote', icon: Calculator, permission: 'quote:view' },
+  { name: '关税计算', href: '/tariff-calculator', icon: Calculator, permission: 'tariff:view' },
+  { name: '账单查询', href: '/invoices', icon: FileText, permission: 'finance:view' },
+  { name: '应付账款', href: '/payables', icon: CreditCard, permission: 'finance:view' },
+  { name: 'API 文档', href: '/api-docs', icon: Book, permission: 'api:view' },
+  { name: '用户管理', href: '/users', icon: Users, permission: 'users:manage' },
 ]
 
 export default function Layout() {
-  const { user, logout } = useAuth()
+  const { user, logout, hasPermission } = useAuth()
   const navigate = useNavigate()
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [userMenuOpen, setUserMenuOpen] = useState(false)
@@ -94,23 +96,29 @@ export default function Layout() {
 
         {/* 导航菜单 */}
         <nav className="flex-1 py-4 px-3 overflow-y-auto">
-          {navigation.map((item) => (
-            <NavLink
-              key={item.name}
-              to={item.href}
-              onClick={() => setSidebarOpen(false)}
-              className={({ isActive }) => `
-                flex items-center px-3 py-2 mb-0.5 rounded-md text-[13px] font-medium transition-colors
-                ${isActive 
-                  ? 'bg-primary-50 text-primary-700' 
-                  : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
-                }
-              `}
-            >
-              <item.icon className="w-[18px] h-[18px] mr-2.5" />
-              {item.name}
-            </NavLink>
-          ))}
+          {navigation.map((item) => {
+            // 如果有权限要求，检查用户是否有权限
+            if (item.permission && !hasPermission(item.permission)) {
+              return null
+            }
+            return (
+              <NavLink
+                key={item.name}
+                to={item.href}
+                onClick={() => setSidebarOpen(false)}
+                className={({ isActive }) => `
+                  flex items-center px-3 py-2 mb-0.5 rounded-md text-[13px] font-medium transition-colors
+                  ${isActive 
+                    ? 'bg-primary-50 text-primary-700' 
+                    : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                  }
+                `}
+              >
+                <item.icon className="w-[18px] h-[18px] mr-2.5" />
+                {item.name}
+              </NavLink>
+            )
+          })}
         </nav>
 
         {/* 底部用户信息 */}

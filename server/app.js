@@ -30,6 +30,8 @@ import financeRoutes from './modules/finance/routes.js'
 import apiKeysRoutes from './modules/api-keys/routes.js'
 import inquiryRoutes from './modules/inquiry/routes.js'
 import shipperRoutes from './modules/shipper/routes.js'
+import usersRoutes from './modules/users/routes.js'
+import rolesRoutes from './modules/roles/routes.js'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -249,6 +251,12 @@ app.use('/api', inquiryRoutes)
 // 发货人/收货人预设管理模块
 app.use('/api/shippers', shipperRoutes)
 
+// 用户管理模块
+app.use('/api/users', usersRoutes)
+
+// 角色管理模块
+app.use('/api/roles', rolesRoutes)
+
 // ==================== 错误处理 ====================
 
 // 404 处理
@@ -338,6 +346,8 @@ async function startServer() {
     console.log('║   [订单] /api/orders - 订单查询、跟踪                       ║')
     console.log('║   [财务] /api/finance - 账单查询、应付款                    ║')
     console.log('║   [密钥] /api/api-keys - API 密钥管理                       ║')
+    console.log('║   [用户] /api/users - 子账户管理                            ║')
+    console.log('║   [角色] /api/roles - 角色权限管理                          ║')
     console.log('║                                                            ║')
     console.log('╚════════════════════════════════════════════════════════════╝')
     console.log('')

@@ -1,13 +1,11 @@
 /**
  * 客户门户认证中间件
- * 方案2：使用本地 portal_customers 表进行验证
+ * 支持主账户（customer_accounts）和子账户（portal_users）登录
  * JWT Token 进行客户身份验证
  */
 
 import jwt from 'jsonwebtoken'
 import { getDatabase } from '../config/database.js'
-// 注：认证不再查询数据库，客户信息直接从 Token 获取
-// 但 logActivity 仍需要数据库连接
 
 // JWT 配置
 const JWT_SECRET = process.env.JWT_SECRET || 'portal-secret-key-change-in-production'
@@ -66,16 +64,23 @@ export function authenticate(req, res, next) {
     })
   }
 
-  // 直接从 Token 获取客户信息（Token 已包含所有必要信息）
+  // 从 Token 获取客户信息
   req.customer = {
     accountId: decoded.accountId,
     customerId: decoded.customerId,
+    customerCode: decoded.customerCode,
     username: decoded.username,
     email: decoded.email,
     companyName: decoded.companyName,
     contactPerson: decoded.contactPerson || decoded.username,
     phone: decoded.phone,
-    status: 'active'
+    status: 'active',
+    // 新增：用户类型和权限信息
+    userType: decoded.userType || 'master',  // master = 主账户, sub = 子账户
+    userId: decoded.userId || decoded.accountId,  // 子账户的 portal_users.id
+    roleId: decoded.roleId || null,
+    roleName: decoded.roleName || null,
+    permissions: decoded.permissions || []  // 权限代码数组
   }
   
   next()
@@ -96,20 +101,100 @@ export function optionalAuth(req, res, next) {
   const decoded = verifyToken(token)
   
   if (decoded) {
-    // 直接从 Token 获取客户信息
     req.customer = {
       accountId: decoded.accountId,
       customerId: decoded.customerId,
+      customerCode: decoded.customerCode,
       username: decoded.username,
       email: decoded.email,
       companyName: decoded.companyName,
       contactPerson: decoded.contactPerson || decoded.username,
       phone: decoded.phone,
-      status: 'active'
+      status: 'active',
+      userType: decoded.userType || 'master',
+      userId: decoded.userId || decoded.accountId,
+      roleId: decoded.roleId || null,
+      roleName: decoded.roleName || null,
+      permissions: decoded.permissions || []
     }
   }
   
   next()
+}
+
+/**
+ * 权限验证中间件
+ * 检查用户是否拥有指定权限
+ * 主账户默认拥有所有权限
+ * 
+ * @param {string|string[]} requiredPermissions - 需要的权限代码，可以是单个或数组
+ * @param {boolean} requireAll - 如果是数组，是否需要全部满足（默认 false，只需满足一个）
+ */
+export function requirePermission(requiredPermissions, requireAll = false) {
+  return (req, res, next) => {
+    // 未认证
+    if (!req.customer) {
+      return res.status(401).json({
+        errCode: 401,
+        msg: '请先登录',
+        data: null
+      })
+    }
+    
+    // 主账户拥有所有权限
+    if (req.customer.userType === 'master') {
+      return next()
+    }
+    
+    // 子账户验证权限
+    const userPermissions = req.customer.permissions || []
+    const permissions = Array.isArray(requiredPermissions) ? requiredPermissions : [requiredPermissions]
+    
+    let hasPermission
+    if (requireAll) {
+      // 需要全部权限
+      hasPermission = permissions.every(p => userPermissions.includes(p))
+    } else {
+      // 只需要其中一个权限
+      hasPermission = permissions.some(p => userPermissions.includes(p))
+    }
+    
+    if (!hasPermission) {
+      return res.status(403).json({
+        errCode: 403,
+        msg: '您没有权限执行此操作',
+        data: null
+      })
+    }
+    
+    next()
+  }
+}
+
+/**
+ * 检查是否为主账户
+ * 某些操作只能由主账户执行（如用户管理、角色管理）
+ */
+export function requireMasterAccount(req, res, next) {
+  if (!req.customer) {
+    return res.status(401).json({
+      errCode: 401,
+      msg: '请先登录',
+      data: null
+    })
+  }
+  
+  // 主账户 或 有 users:manage 权限的子账户
+  if (req.customer.userType === 'master' || 
+      (req.customer.permissions && req.customer.permissions.includes('users:manage'))) {
+    return next()
+  }
+  
+  return res.status(403).json({
+    errCode: 403,
+    msg: '此操作需要管理员权限',
+    data: null
+  })
 }
 
 /**
@@ -152,10 +237,37 @@ export async function logActivity(params) {
   }
 }
 
+/**
+ * 获取用户的权限列表
+ * @param {number} roleId - 角色ID
+ * @returns {Promise<string[]>} 权限代码数组
+ */
+export async function getUserPermissions(roleId) {
+  if (!roleId) return []
+  
+  try {
+    const db = getDatabase()
+    const permissions = await db.prepare(`
+      SELECT p.code
+      FROM portal_permissions p
+      INNER JOIN portal_role_permissions rp ON p.id = rp.permission_id
+      WHERE rp.role_id = $1
+    `).all(roleId)
+    
+    return permissions.map(p => p.code)
+  } catch (error) {
+    console.error('获取用户权限失败:', error)
+    return []
+  }
+}
+
 export default {
   generateToken,
   verifyToken,
   authenticate,
   optionalAuth,
-  logActivity
+  requirePermission,
+  requireMasterAccount,
+  logActivity,
+  getUserPermissions
 }

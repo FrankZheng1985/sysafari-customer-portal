@@ -304,5 +304,79 @@ export const portalApi = {
   deleteConsignee: (id: string) => api.delete(`/shippers/consignees/${id}`),
   
   // 设为默认收货人
-  setDefaultConsignee: (id: string) => api.post(`/shippers/consignees/${id}/set-default`)
+  setDefaultConsignee: (id: string) => api.post(`/shippers/consignees/${id}/set-default`),
+
+  // ==================== 用户管理（子账户） ====================
+  // 获取子账户列表
+  getUsers: (params?: {
+    page?: number
+    pageSize?: number
+    status?: string
+    keyword?: string
+  }) => api.get('/users', { params }),
+  
+  // 获取子账户详情
+  getUserById: (id: number) => api.get(`/users/${id}`),
+  
+  // 创建子账户
+  createUser: (data: {
+    username: string
+    email?: string
+    password?: string
+    displayName?: string
+    phone?: string
+    roleId?: number
+  }) => api.post('/users', data),
+  
+  // 更新子账户
+  updateUser: (id: number, data: {
+    email?: string
+    displayName?: string
+    phone?: string
+    roleId?: number
+    status?: string
+  }) => api.put(`/users/${id}`, data),
+  
+  // 删除子账户
+  deleteUser: (id: number) => api.delete(`/users/${id}`),
+  
+  // 重置密码
+  resetUserPassword: (id: number, newPassword?: string) => 
+    api.post(`/users/${id}/reset-password`, { newPassword }),
+  
+  // 切换用户状态
+  toggleUserStatus: (id: number) => api.post(`/users/${id}/toggle-status`),
+
+  // ==================== 角色管理 ====================
+  // 获取角色列表
+  getRoles: () => api.get('/roles'),
+  
+  // 获取角色详情（含权限）
+  getRoleById: (id: number) => api.get(`/roles/${id}`),
+  
+  // 创建角色
+  createRole: (data: {
+    name: string
+    description?: string
+    permissionIds?: number[]
+    isDefault?: boolean
+  }) => api.post('/roles', data),
+  
+  // 更新角色
+  updateRole: (id: number, data: {
+    name?: string
+    description?: string
+    permissionIds?: number[]
+    isDefault?: boolean
+    status?: string
+  }) => api.put(`/roles/${id}`, data),
+  
+  // 删除角色
+  deleteRole: (id: number) => api.delete(`/roles/${id}`),
+  
+  // 初始化默认角色
+  initDefaultRoles: () => api.post('/roles/init-default'),
+  
+  // 获取所有权限定义
+  getPermissions: () => api.get('/roles/permissions')
 }

@@ -13,6 +13,7 @@ import Quote from './pages/Quote'
 import TariffCalculator from './pages/TariffCalculator'
 import ApiDocs from './pages/ApiDocs'
 import Settings from './pages/Settings'
+import UserManagement from './pages/UserManagement'
 import { portalApi } from './utils/api'
 
 // 动态设置 Favicon 为公司 Logo
@@ -93,6 +94,7 @@ function App() {
             <Route path="payables" element={<Payables />} />
             <Route path="api-docs" element={<ApiDocs />} />
             <Route path="settings" element={<Settings />} />
+            <Route path="users" element={<UserManagement />} />
           </Route>
           
           {/* 404 重定向 */}
