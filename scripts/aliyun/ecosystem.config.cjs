@@ -3,6 +3,13 @@
  * 客户门户系统 - 端口 3003
  */
 
+const path = require('path')
+
+// 加载 .env 文件
+require('dotenv').config({ 
+  path: path.join('/var/www/sysafari-customer-portal/server', '.env') 
+})
+
 module.exports = {
   apps: [{
     name: 'portal-api',
@@ -14,7 +21,10 @@ module.exports = {
     max_memory_restart: '500M',
     env: {
       NODE_ENV: 'production',
-      PORT: 3003
+      PORT: process.env.PORT || 3003,
+      DATABASE_URL: process.env.DATABASE_URL,
+      MAIN_API_URL: process.env.MAIN_API_URL || 'http://localhost:3001',
+      MAIN_API_KEY: process.env.MAIN_API_KEY || ''
     },
     error_file: '/var/www/sysafari-customer-portal/logs/error.log',
     out_file: '/var/www/sysafari-customer-portal/logs/out.log',
