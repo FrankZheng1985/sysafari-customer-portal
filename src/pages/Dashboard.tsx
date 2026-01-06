@@ -11,8 +11,7 @@ import {
   ArrowRight,
   Ship,
   Plus,
-  BarChart3,
-  Calendar
+  BarChart3
 } from 'lucide-react'
 
 interface OrderStats {
@@ -57,7 +56,6 @@ export default function Dashboard() {
   // 订单趋势相关状态
   const [trend, setTrend] = useState<OrderTrend | null>(null)
   const [trendDateType, setTrendDateType] = useState<'created' | 'customs'>('created')
-  const [trendViewType, setTrendViewType] = useState<'month' | 'year'>('month')
 
   useEffect(() => {
     fetchDashboardData()
@@ -257,31 +255,6 @@ export default function Dashboard() {
                 清关完成
               </button>
             </div>
-            {/* 月/年切换 */}
-            <div className="flex items-center gap-1 bg-gray-100 rounded-lg p-0.5">
-              <button
-                onClick={() => setTrendViewType('month')}
-                className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all flex items-center gap-1 ${
-                  trendViewType === 'month'
-                    ? 'bg-white text-primary-600 shadow-sm'
-                    : 'text-gray-500 hover:text-gray-700'
-                }`}
-              >
-                <Calendar className="w-3.5 h-3.5" />
-                月
-              </button>
-              <button
-                onClick={() => setTrendViewType('year')}
-                className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all flex items-center gap-1 ${
-                  trendViewType === 'year'
-                    ? 'bg-white text-primary-600 shadow-sm'
-                    : 'text-gray-500 hover:text-gray-700'
-                }`}
-              >
-                <Calendar className="w-3.5 h-3.5" />
-                年
-              </button>
-            </div>
           </div>
         </div>
         
@@ -310,32 +283,31 @@ export default function Dashboard() {
             {/* 柱状图 */}
             {trend?.months.map((item) => {
               const maxCount = Math.max(...(trend?.months.map(m => m.count) || [1]), 1)
+              // 计算高度百分比，确保高低差异明显
               const heightPercent = maxCount > 0 ? (item.count / maxCount) * 100 : 0
-              // 根据数值比例计算颜色深浅：低值浅色，高值深色
-              const colorIntensity = maxCount > 0 ? Math.max(0.3, item.count / maxCount) : 0.3
+              // 根据数值高低区分颜色
               const isHighValue = heightPercent >= 70  // 高于70%为高值
               const isMediumValue = heightPercent >= 40 && heightPercent < 70  // 40-70%为中值
               
               return (
-                <div key={item.month} className="flex-1 flex flex-col items-center justify-end relative group">
-                  {/* 柱子 - 根据高低使用不同颜色 */}
+                <div key={item.month} className="flex-1 flex flex-col items-center justify-end relative group h-full">
+                  {/* 柱子 - 高度直接反映数值大小 */}
                   <div
-                    className={`w-full max-w-8 rounded-t transition-all duration-300 cursor-pointer relative shadow-sm ${
+                    className={`w-full max-w-10 rounded-t-md transition-all duration-300 cursor-pointer relative ${
                       item.count === 0 
                         ? 'bg-gray-200' 
                         : isHighValue 
-                          ? 'bg-primary-600 hover:bg-primary-700' 
+                          ? 'bg-primary-600 hover:bg-primary-700 shadow-md' 
                           : isMediumValue 
-                            ? 'bg-primary-500 hover:bg-primary-600' 
+                            ? 'bg-primary-500 hover:bg-primary-600 shadow-sm' 
                             : 'bg-primary-400 hover:bg-primary-500'
                     }`}
                     style={{ 
-                      height: heightPercent > 0 ? `${Math.max(heightPercent, 6)}%` : '3px',
-                      minHeight: item.count > 0 ? '12px' : '3px',
-                      opacity: item.count > 0 ? colorIntensity + 0.4 : 0.5
+                      // 直接使用百分比高度，最小3px用于零值显示
+                      height: item.count > 0 ? `${heightPercent}%` : '3px',
                     }}
                   >
-                    {/* 始终显示的数值 */}
+                    {/* 数值标签 */}
                     {item.count > 0 && (
                       <span className={`absolute -top-5 left-1/2 -translate-x-1/2 text-xs font-bold whitespace-nowrap ${
                         isHighValue ? 'text-primary-700' : isMediumValue ? 'text-primary-600' : 'text-primary-500'
