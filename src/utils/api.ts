@@ -115,24 +115,24 @@ export const portalApi = {
   // 获取港口选项
   getPorts: () => mainApi.get('/orders/ports'),
   
-  // ==================== 财务/账单相关（从主系统获取）====================
+  // ==================== 财务/账单相关（通过门户后端转发到主系统）====================
   getInvoices: (params?: {
     page?: number
     pageSize?: number
     status?: string
     startDate?: string
     endDate?: string
-  }) => mainApi.get('/invoices', { params }),
+  }) => api.get('/invoices', { params }),
   
-  getInvoiceById: (id: string) => mainApi.get(`/invoices/${id}`),
+  getInvoiceById: (id: string) => api.get(`/invoices/${id}`),
   
   downloadInvoicePdf: (id: string) => 
-    mainApi.get(`/invoices/${id}/pdf`, { responseType: 'blob' }),
+    api.get(`/invoices/${id}/pdf`, { responseType: 'blob' }),
   
-  getPayablesSummary: () => mainApi.get('/payables'),
+  getPayablesSummary: () => api.get('/payables'),
   
   getFinanceStats: (params?: { year?: number; month?: number }) => 
-    mainApi.get('/payables', { params }),
+    api.get('/payables', { params }),
   
   // ==================== API 密钥管理（从主系统获取）====================
   getApiKeys: () => mainApi.get('/api-keys'),
@@ -158,9 +158,9 @@ export const portalApi = {
   getHealth: () => api.get('/health'),
   getSystemLogo: () => api.get('/system/logo'),
 
-  // ==================== 从主系统获取的接口 ====================
+  // ==================== 从门户后端获取的接口（后端转发到主系统）====================
   // 应付款（dashboard 使用）
-  getPayables: () => mainApi.get('/payables'),
+  getPayables: () => api.get('/payables'),
   
   // 询价相关（Quote 页面使用）- 使用门户后端 API
   getInquiries: (params?: any) => api.get('/inquiries', { params }),
@@ -228,7 +228,7 @@ export const portalApi = {
   
   // 下载 Excel（账单页面使用）
   downloadInvoiceExcel: (id: string) => 
-    mainApi.get(`/invoices/${id}/excel`, { responseType: 'blob' }),
+    api.get(`/invoices/${id}/excel`, { responseType: 'blob' }),
 
   // ==================== 发货人预设管理 ====================
   // 获取发货人列表

@@ -11,7 +11,7 @@ const router = Router()
 
 // 主系统 API 配置
 const MAIN_API_URL = process.env.MAIN_API_URL || 'http://127.0.0.1:3001'
-const MAIN_API_KEY = process.env.MAIN_API_KEY || ''
+const MAIN_API_KEY = process.env.MAIN_API_KEY || 'portal_internal_key'
 
 /**
  * 获取应付款汇总（根路由，兼容 /api/payables）
