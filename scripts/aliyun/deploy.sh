@@ -40,20 +40,43 @@ npm run build
 
 # 同步前端文件到 Nginx 服务目录
 echo "📁 同步前端文件..."
-# 强制删除旧文件（包括隐藏文件）
+
+# 获取新构建的JS文件名
+NEW_JS=$(cat $APP_DIR/dist/index.html | grep -o 'index-[^"]*\.js')
+echo "📋 新构建的JS文件: $NEW_JS"
+
+# 强制完全删除并重建目录
 rm -rf /var/www/portal
+sleep 1
 mkdir -p /var/www/portal
-# 使用 rsync 确保完整同步，如果没有 rsync 则用 cp
-if command -v rsync &> /dev/null; then
-    rsync -av --delete $APP_DIR/dist/ /var/www/portal/
-else
-    cp -r $APP_DIR/dist/* /var/www/portal/
-fi
+
+# 使用 cp 直接复制（比rsync更可靠）
+cp -rf $APP_DIR/dist/* /var/www/portal/
+
 # 强制同步到磁盘
 sync
+sleep 1
+
 # 验证同步结果
-echo "📋 验证前端文件..."
-cat /var/www/portal/index.html | grep -o 'index-[^"]*\.js'
+DEPLOYED_JS=$(cat /var/www/portal/index.html | grep -o 'index-[^"]*\.js')
+echo "📋 已部署的JS文件: $DEPLOYED_JS"
+
+# 检查文件是否匹配
+if [ "$NEW_JS" != "$DEPLOYED_JS" ]; then
+    echo "❌ 错误：文件同步失败！"
+    echo "期望: $NEW_JS"
+    echo "实际: $DEPLOYED_JS"
+    exit 1
+fi
+
+# 检查JS文件是否存在
+if [ ! -f "/var/www/portal/assets/$DEPLOYED_JS" ]; then
+    echo "❌ 错误：JS文件不存在！"
+    ls -la /var/www/portal/assets/
+    exit 1
+fi
+
+echo "✅ 文件同步验证通过"
 
 # 重载 Nginx
 echo "🔄 重载 Nginx..."
