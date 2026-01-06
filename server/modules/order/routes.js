@@ -158,9 +158,10 @@ router.get('/trend', authenticate, async (req, res) => {
     const startDateStr = startDate.toISOString().split('T')[0]
     
     // 根据 dateType 选择日期字段
-    // 注意：create_time 是 TEXT 类型，需要转换为 timestamp
+    // 注意：create_time 和 customs_release_time 都是 TEXT 类型，需要转换为 timestamp
     const dateField = dateType === 'customs' ? 'customs_release_time' : 'create_time'
-    const dateFieldCast = dateType === 'customs' ? dateField : `${dateField}::timestamp`
+    // 两种字段都需要类型转换
+    const dateFieldCast = `${dateField}::timestamp`
     
     // 按月统计订单数量
     const trendData = await db.prepare(`
