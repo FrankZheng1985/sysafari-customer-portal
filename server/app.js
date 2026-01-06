@@ -83,21 +83,26 @@ app.use(morgan('combined'))
 // API 速率限制
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 分钟
-  max: 100, // 每个 IP 最多 100 次请求
+  max: 500, // 每个 IP 最多 500 次请求（放宽限制）
   standardHeaders: true,
   legacyHeaders: false,
   message: {
     errCode: 429,
     msg: '请求过于频繁，请稍后再试',
     data: null
+  },
+  // 跳过健康检查等公共接口
+  skip: (req) => {
+    const skipPaths = ['/api/health', '/api/system']
+    return skipPaths.some(path => req.path.startsWith(path))
   }
 })
 app.use('/api', limiter)
 
-// 登录接口更严格的速率限制
+// 登录接口速率限制（放宽到 20 次）
 const loginLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 分钟
-  max: 5, // 每个 IP 最多 5 次登录尝试
+  max: 20, // 每个 IP 最多 20 次登录尝试（从5次放宽到20次）
   message: {
     errCode: 429,
     msg: '登录尝试过多，请 15 分钟后再试',
