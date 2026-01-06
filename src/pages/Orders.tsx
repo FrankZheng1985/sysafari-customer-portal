@@ -328,6 +328,36 @@ export default function Orders() {
         </Link>
       </div>
 
+      {/* 订单统计卡片 */}
+      <div className="card p-5">
+        <div className="flex items-center gap-2 mb-4">
+          <BarChart3 className="w-5 h-5 text-gray-500" />
+          <span className="text-sm font-medium text-gray-700">订单统计</span>
+        </div>
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+          <div className="bg-blue-50 rounded-lg p-4 text-center">
+            <p className="text-2xl font-bold text-blue-600">{stats.total}</p>
+            <p className="text-xs text-gray-500 mt-1">总订单数</p>
+          </div>
+          <div className="bg-purple-50 rounded-lg p-4 text-center">
+            <p className="text-2xl font-bold text-purple-600">{stats.inProgress}</p>
+            <p className="text-xs text-gray-500 mt-1">进行中</p>
+          </div>
+          <div className="bg-green-50 rounded-lg p-4 text-center">
+            <p className="text-2xl font-bold text-green-600">{stats.completed}</p>
+            <p className="text-xs text-gray-500 mt-1">已完成</p>
+          </div>
+          <div className="bg-orange-50 rounded-lg p-4 text-center">
+            <p className="text-2xl font-bold text-orange-600">{stats.totalWeight.toLocaleString()}</p>
+            <p className="text-xs text-gray-500 mt-1">总重量(KG)</p>
+          </div>
+          <div className="bg-cyan-50 rounded-lg p-4 text-center">
+            <p className="text-2xl font-bold text-cyan-600">{stats.totalVolume.toFixed(2)}</p>
+            <p className="text-xs text-gray-500 mt-1">总立方(CBM)</p>
+          </div>
+        </div>
+      </div>
+
       {/* 订单量趋势图表 */}
       <div className="card p-5">
         <div className="flex items-center justify-between mb-6">
