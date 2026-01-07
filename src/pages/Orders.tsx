@@ -23,6 +23,8 @@ interface OrderStats {
   completed: number
   totalWeight: number
   totalVolume: number
+  pendingReview?: number  // 待审核数量
+  rejected?: number       // 退回数量
 }
 
 interface Order {
@@ -43,6 +45,11 @@ interface Order {
   etd: string
   eta: string
   createdAt: string
+  // 审核相关字段
+  source?: string
+  reviewStatus?: string
+  rejectReason?: string
+  reviewedAt?: string
 }
 
 export default function Orders() {
@@ -53,7 +60,7 @@ export default function Orders() {
   const [currentPageSize, setCurrentPageSize] = useState(20)
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('')
-  const [activeTab, setActiveTab] = useState<'all' | 'inProgress' | 'completed'>('all')
+  const [activeTab, setActiveTab] = useState<'all' | 'inProgress' | 'completed' | 'pendingReview'>('all')
   const [stats, setStats] = useState<OrderStats>({ total: 0, inProgress: 0, completed: 0, totalWeight: 0, totalVolume: 0 })
   
   // 筛选条件
@@ -137,6 +144,8 @@ export default function Orders() {
         params.progressStatus = 'in_progress' // 进行中
       } else if (activeTab === 'completed') {
         params.progressStatus = 'completed' // 已完成
+      } else if (activeTab === 'pendingReview') {
+        params.reviewStatus = 'pending,rejected' // 待审核和被退回
       }
       
       console.log('🔍 当前标签:', activeTab, '请求参数:', params)
@@ -212,11 +221,21 @@ export default function Orders() {
       '派送中': 'bg-blue-100 text-blue-700',
       '已送达': 'bg-green-100 text-green-700',
       '进行中': 'bg-gray-100 text-gray-600',
+      // 审核状态
+      '待审核': 'bg-amber-100 text-amber-700',
+      '已退回': 'bg-red-100 text-red-700',
     }
     return statusMap[status] || 'bg-gray-100 text-gray-600'
   }
+  
+  // 获取审核状态显示
+  const getReviewStatusDisplay = (order: Order) => {
+    if (order.reviewStatus === 'pending') return '待审核'
+    if (order.reviewStatus === 'rejected') return '已退回'
+    return null
+  }
 
-  const handleTabChange = (tab: 'all' | 'inProgress' | 'completed') => {
+  const handleTabChange = (tab: 'all' | 'inProgress' | 'completed' | 'pendingReview') => {
     console.log('🔄 切换标签到:', tab)
     setActiveTab(tab)
     setPage(1)
@@ -347,6 +366,22 @@ export default function Orders() {
         >
           已完成 ({stats.completed})
         </button>
+        {/* 待审核/退回标签 - 只有门户提交的提单才会进入此列表 */}
+        {(stats.pendingReview || 0) + (stats.rejected || 0) > 0 && (
+          <button
+            onClick={() => handleTabChange('pendingReview')}
+            className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors whitespace-nowrap relative ${
+              activeTab === 'pendingReview'
+                ? 'border-orange-600 text-orange-600'
+                : 'border-transparent text-gray-500 hover:text-gray-700'
+            }`}
+          >
+            待审核/退回 ({(stats.pendingReview || 0) + (stats.rejected || 0)})
+            {(stats.rejected || 0) > 0 && (
+              <span className="absolute -top-1 -right-1 w-2 h-2 bg-red-500 rounded-full"></span>
+            )}
+          </button>
+        )}
       </div>
 
       {/* 搜索和筛选 */}
@@ -527,9 +562,22 @@ export default function Orders() {
                       <td className="text-gray-700 whitespace-nowrap">{order.etd || '-'}</td>
                       <td className="text-gray-700 whitespace-nowrap">{order.eta || '-'}</td>
                       <td className="text-center">
-                        <span className={`status-badge ${getStatusColor(getOrderStatus(order))}`}>
-                          {getOrderStatus(order)}
-                        </span>
+                        {activeTab === 'pendingReview' && getReviewStatusDisplay(order) ? (
+                          <div className="flex flex-col items-center gap-1">
+                            <span className={`status-badge ${getStatusColor(getReviewStatusDisplay(order)!)}`}>
+                              {getReviewStatusDisplay(order)}
+                            </span>
+                            {order.reviewStatus === 'rejected' && order.rejectReason && (
+                              <span className="text-xs text-red-600 max-w-[150px] truncate" title={order.rejectReason}>
+                                {order.rejectReason}
+                              </span>
+                            )}
+                          </div>
+                        ) : (
+                          <span className={`status-badge ${getStatusColor(getOrderStatus(order))}`}>
+                            {getOrderStatus(order)}
+                          </span>
+                        )}
                       </td>
                       <td className="text-center">
                         <Link
