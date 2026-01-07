@@ -14,6 +14,9 @@ interface User {
   roleId?: number
   roleName?: string
   permissions: string[]  // 权限代码数组
+  // 工作人员代登录相关字段
+  staffProxy?: boolean
+  staffName?: string
 }
 
 interface AuthContextType {
@@ -22,6 +25,7 @@ interface AuthContextType {
   isAuthenticated: boolean
   loading: boolean
   login: (username: string, password: string) => Promise<void>
+  loginWithToken: (token: string) => Promise<void>  // 工作人员代登录使用
   logout: () => void
   updateUser: (user: User) => void
   // 权限判断方法
@@ -29,6 +33,9 @@ interface AuthContextType {
   hasAnyPermission: (permissions: string[]) => boolean
   hasAllPermissions: (permissions: string[]) => boolean
   isMasterAccount: () => boolean
+  // 代登录标记
+  isStaffProxy: boolean
+  staffInfo: { staffId: number; staffName: string; staffRole: string } | null
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
@@ -150,6 +157,55 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(userData)
   }
 
+  /**
+   * 通过 Token 直接登录（用于工作人员代登录）
+   * Token 是由 ERP 系统工作人员代登录 API 生成的
+   */
+  const loginWithToken = async (proxyToken: string) => {
+    // 先设置 token 到 header
+    api.defaults.headers.common['Authorization'] = `Bearer ${proxyToken}`
+    
+    try {
+      // 验证 token 并获取用户信息
+      const response = await api.get('/auth/me')
+      
+      if (response.data.errCode !== 200) {
+        delete api.defaults.headers.common['Authorization']
+        throw new Error(response.data.msg || '代登录失败：Token 无效')
+      }
+      
+      const data = response.data.data
+      
+      // 转换字段名
+      const userData: User = {
+        id: data.id,
+        customerId: data.customerId,
+        customerName: data.companyName || data.customerName,
+        customerCode: data.customerCode || data.customerId,
+        username: data.username || data.email,
+        displayName: data.displayName || data.contactPerson,
+        email: data.email,
+        phone: data.phone,
+        userType: data.userType || 'master',
+        roleId: data.roleId,
+        roleName: data.roleName,
+        permissions: data.permissions || [],
+        // 代登录标记
+        staffProxy: data.staffProxy || false,
+        staffName: data.staffName
+      }
+      
+      // 保存到 localStorage
+      localStorage.setItem('portal_token', proxyToken)
+      localStorage.setItem('portal_user', JSON.stringify(userData))
+      setToken(proxyToken)
+      setUser(userData)
+    } catch (error) {
+      delete api.defaults.headers.common['Authorization']
+      throw error
+    }
+  }
+
   const logout = () => {
     handleLogout()
   }
@@ -205,12 +261,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       isAuthenticated: !!user,
       loading,
       login,
+      loginWithToken,
       logout,
       updateUser,
       hasPermission,
       hasAnyPermission,
       hasAllPermissions,
-      isMasterAccount
+      isMasterAccount,
+      // 代登录相关
+      isStaffProxy: user?.staffProxy || false,
+      staffInfo: user?.staffProxy ? {
+        staffId: 0, // 暂时没有传递
+        staffName: user.staffName || '',
+        staffRole: ''
+      } : null
     }}>
       {children}
     </AuthContext.Provider>

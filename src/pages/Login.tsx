@@ -1,7 +1,7 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
-import { Eye, EyeOff, AlertCircle } from 'lucide-react'
+import { Eye, EyeOff, AlertCircle, UserCheck } from 'lucide-react'
 import { fetchSystemLogo } from '../App'
 
 export default function Login() {
@@ -12,17 +12,19 @@ export default function Login() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [logoUrl, setLogoUrl] = useState<string | null>(null)
+  const [proxyLoginLoading, setProxyLoginLoading] = useState(false)
+  const tokenLoginAttempted = useRef(false)  // 防止重复尝试 token 登录
   
-  const { login, isAuthenticated, loading: authLoading } = useAuth()
+  const { login, loginWithToken, isAuthenticated, loading: authLoading } = useAuth()
 
   // 如果用户已登录（页面初始加载时检查），直接跳转到首页
   // 使用 window.location 而不是 navigate，避免 React Router 状态问题
   useEffect(() => {
     // 只在初始加载完成后检查，避免闪烁
-    if (!authLoading && isAuthenticated) {
+    if (!authLoading && isAuthenticated && !proxyLoginLoading) {
       window.location.href = '/'
     }
-  }, [authLoading, isAuthenticated])
+  }, [authLoading, isAuthenticated, proxyLoginLoading])
 
   // 获取系统 Logo（使用共享缓存）
   useEffect(() => {
@@ -34,6 +36,29 @@ export default function Login() {
     }
     loadLogo()
   }, [])
+
+  // 处理工作人员代登录（通过 URL 中的 token 参数）
+  useEffect(() => {
+    const tokenParam = searchParams.get('token')
+    
+    // 如果有 token 参数且还没尝试过登录
+    if (tokenParam && !tokenLoginAttempted.current && !isAuthenticated && !authLoading) {
+      tokenLoginAttempted.current = true
+      setProxyLoginLoading(true)
+      setError('')
+      
+      // 使用 token 直接登录
+      loginWithToken(tokenParam)
+        .then(() => {
+          // 登录成功，跳转到首页
+          window.location.href = '/'
+        })
+        .catch((err: Error) => {
+          setError(err.message || '代登录失败，请使用用户名密码登录')
+          setProxyLoginLoading(false)
+        })
+    }
+  }, [searchParams, loginWithToken, isAuthenticated, authLoading])
 
   // 从 URL 参数自动填充用户名
   useEffect(() => {
@@ -126,7 +151,21 @@ export default function Login() {
       {/* 右侧登录表单 */}
       <div className="flex-1 flex items-center justify-center p-6 bg-gray-50">
         <div className="w-full max-w-sm">
-          {/* 移动端 Logo */}
+          {/* 工作人员代登录加载中 */}
+          {proxyLoginLoading && (
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-8 text-center">
+              <div className="w-12 h-12 bg-primary-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <UserCheck className="w-6 h-6 text-primary-600 animate-pulse" />
+              </div>
+              <h2 className="text-lg font-semibold text-gray-900 mb-2">工作人员代登录</h2>
+              <p className="text-sm text-gray-500 mb-4">正在验证登录信息，请稍候...</p>
+              <div className="w-8 h-8 border-2 border-primary-600 border-t-transparent rounded-full animate-spin mx-auto" />
+            </div>
+          )}
+
+          {/* 移动端 Logo 和登录表单 */}
+          {!proxyLoginLoading && (
+          <>
           <div className="lg:hidden flex items-center justify-center space-x-2 mb-6">
             <div className="w-9 h-9 bg-white rounded-lg flex items-center justify-center p-1.5 shadow-sm">
               {logoUrl ? (
@@ -219,6 +258,8 @@ export default function Login() {
           <p className="mt-6 text-center text-[11px] text-gray-400">
             © {new Date().getFullYear()} BP Logistics Sys. All rights reserved.
           </p>
+          </>
+          )}
         </div>
       </div>
     </div>
