@@ -58,12 +58,9 @@ api.interceptors.response.use(
     return response
   },
   (error) => {
-    if (error.response?.status === 401) {
-      // Token 过期或无效
-      localStorage.removeItem('portal_token')
-      localStorage.removeItem('portal_customer')
-      window.location.href = '/login'
-    }
+    // 401 错误不自动重定向，让组件自己处理
+    // 只有在明确需要时才清除登录状态
+    // 避免循环重定向问题
     return Promise.reject(error)
   }
 )
@@ -74,11 +71,7 @@ mainApi.interceptors.response.use(
     return response
   },
   (error) => {
-    if (error.response?.status === 401) {
-      localStorage.removeItem('portal_token')
-      localStorage.removeItem('portal_customer')
-      window.location.href = '/login'
-    }
+    // 401 错误不自动重定向，让组件自己处理
     return Promise.reject(error)
   }
 )
@@ -96,7 +89,7 @@ export const portalApi = {
   changePassword: (oldPassword: string, newPassword: string) => 
     api.post('/auth/change-password', { oldPassword, newPassword }),
   
-  // ==================== 订单相关（从主系统获取）====================
+  // ==================== 订单相关（使用门户后端 API）====================
   getOrders: (params?: {
     page?: number
     pageSize?: number
@@ -104,20 +97,20 @@ export const portalApi = {
     keyword?: string
     startDate?: string
     endDate?: string
-  }) => mainApi.get('/orders', { params }),
+  }) => api.get('/orders', { params }),
   
-  getOrderById: (id: string) => mainApi.get(`/orders/${id}`),
+  getOrderById: (id: string) => api.get(`/orders/${id}`),
   
-  getOrderTracking: (id: string) => mainApi.get(`/orders/${id}/tracking`),
+  getOrderTracking: (id: string) => api.get(`/orders/${id}/tracking`),
   
-  getOrderStats: () => mainApi.get('/orders/stats'),
+  getOrderStats: () => api.get('/orders/stats'),
   
   // 获取订单量趋势（使用门户后端API）
   getOrderTrend: (params?: { type?: 'month' | 'year'; dateType?: 'created' | 'customs' }) => 
     api.get('/orders/trend', { params }),
   
-  // 获取港口选项
-  getPorts: () => mainApi.get('/orders/ports'),
+  // 获取港口选项（使用门户后端 API）
+  getPorts: () => api.get('/orders/ports'),
   
   // ==================== 财务/账单相关（通过门户后端转发到主系统）====================
   getInvoices: (params?: {

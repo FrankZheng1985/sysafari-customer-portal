@@ -515,12 +515,15 @@ router.get('/:id', authenticate, async (req, res) => {
       SELECT 
         id, order_number, bill_number, container_number,
         shipper, consignee, notify_party, port_of_loading, port_of_discharge,
-        place_of_delivery, transport_method, container_type,
+        place_of_delivery, transport_method, container_type, shipping_line, seal_number,
         pieces, weight, volume, status, ship_status,
         customs_status, delivery_status, doc_swap_status,
         etd, eta, ata, external_order_no,
         customer_name, customer_code,
-        vessel, voyage, description, remark,
+        vessel, voyage, terminal, description, remark, service_type,
+        cargo_type, transport_service, bill_type,
+        container_return, container_return_location, full_container_delivery, last_mile_transport,
+        devan_service, t1_customs_service,
         doc_swap_time, customs_release_time,
         created_at, updated_at
       FROM bills_of_lading
@@ -553,6 +556,8 @@ router.get('/:id', authenticate, async (req, res) => {
       placeOfDelivery: order.place_of_delivery,
       transportMethod: order.transport_method,
       containerType: order.container_type,
+      shippingLine: order.shipping_line,
+      sealNumber: order.seal_number,
       status: order.status,
       rawStatus: order.status,
       shipStatus: order.ship_status,
@@ -563,6 +568,7 @@ router.get('/:id', authenticate, async (req, res) => {
       customsReleaseTime: order.customs_release_time,
       vessel: order.vessel,
       voyage: order.voyage,
+      terminal: order.terminal,
       etd: order.etd,
       eta: order.eta,
       ata: order.ata,
@@ -571,6 +577,19 @@ router.get('/:id', authenticate, async (req, res) => {
       volume: order.volume,
       description: order.description,
       remark: order.remark,
+      serviceType: order.service_type,
+      // 附加属性
+      cargoType: order.cargo_type,
+      transportService: order.transport_service,
+      billType: order.bill_type,
+      // 额外服务
+      containerReturn: order.container_return,
+      containerReturnLocation: order.container_return_location,
+      fullContainerDelivery: order.full_container_delivery,
+      lastMileTransport: order.last_mile_transport,
+      devanService: order.devan_service,
+      t1CustomsService: order.t1_customs_service,
+      // 客户信息
       customerName: order.customer_name,
       customerCode: order.customer_code,
       createdAt: order.created_at,
@@ -738,6 +757,7 @@ router.post('/', authenticate, async (req, res) => {
       billType,               // 提单类型: master(船东单) / house(货代单)
       // 额外服务
       containerReturn,        // 异地还柜: remote(异地还柜) / local(本地还柜)
+      containerReturnLocation, // 异地还柜地点
       fullContainerDelivery,  // 全程整柜运输: full(必须整柜派送) / devan(可拆柜后托盘送货)
       lastMileTransport,      // 末端运输方式
       devanService,           // 拆柜: yes(需要拆柜分货服务) / no(不需要拆柜)
@@ -813,7 +833,7 @@ router.post('/', authenticate, async (req, res) => {
         pieces, weight, volume,
         description, remark, service_type,
         cargo_type, transport_service, bill_type,
-        container_return, full_container_delivery, last_mile_transport,
+        container_return, container_return_location, full_container_delivery, last_mile_transport,
         devan_service, t1_customs_service,
         status, ship_status, customs_status, delivery_status,
         source, created_at, updated_at
@@ -828,10 +848,10 @@ router.post('/', authenticate, async (req, res) => {
         $23, $24, $25,
         $26, $27, $28,
         $29, $30, $31,
-        $32, $33, $34,
-        $35, $36,
-        $37, $38, $39, $40,
-        $41, NOW(), NOW()
+        $32, $33, $34, $35,
+        $36, $37,
+        $38, $39, $40, $41,
+        $42, NOW(), NOW()
       )
     `).run(
       orderId, orderNumber, billNumber || null, externalOrderNo || null,
@@ -844,31 +864,56 @@ router.post('/', authenticate, async (req, res) => {
       pieces || null, weight || null, volume || null,
       description || null, remark || null, serviceType || 'door-to-door',
       cargoTypeMap[cargoType] || '整箱', transportServiceMap[transportService] || '委托我司运输', billTypeMap[billType] || '船东单',
-      containerReturnMap[containerReturn] || '本地还柜', fullContainerDeliveryMap[fullContainerDelivery] || '必须整柜派送', lastMileTransportMap[lastMileTransport] || '卡车派送',
+      containerReturnMap[containerReturn] || '本地还柜', containerReturnLocation || null, fullContainerDeliveryMap[fullContainerDelivery] || '必须整柜派送', lastMileTransportMap[lastMileTransport] || '卡车派送',
       devanServiceMap[devanService] || '不需要拆柜', t1CustomsServiceMap[t1CustomsService] || '否',
       '待处理', '未到港', null, null,
       'customer_portal'  // 标记来源为客户门户
     )
     
-    // 如果有货物明细，保存到 cargo_items 表（如果存在）
+    // 如果有货物明细，保存到 cargo_items 表
     if (cargoItems && cargoItems.length > 0) {
       try {
-        for (const item of cargoItems) {
+        for (let i = 0; i < cargoItems.length; i++) {
+          const item = cargoItems[i]
           if (item.productName || item.productNameEn) {
             await db.prepare(`
               INSERT INTO cargo_items (
-                id, bill_id, product_name, product_name_en, hs_code,
-                quantity, unit, unit_price, created_at
-              ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW())
+                id, bill_id, no, marks, product_name, product_name_en, spec, hs_code,
+                material, usage, brand, origin, quantity, unit, unit_price, total_price,
+                net_weight, gross_weight, packages, packing_type, volume, created_at
+              ) VALUES (
+                $1, $2, $3, $4, $5, $6, $7, $8,
+                $9, $10, $11, $12, $13, $14, $15, $16,
+                $17, $18, $19, $20, $21, NOW()
+              )
             `).run(
-              uuidv4(), orderId, item.productName || null, item.productNameEn || null, item.hsCode || null,
-              item.quantity || 0, item.unit || 'PCS', item.unitPrice || 0
+              uuidv4(),                           // id
+              orderId,                            // bill_id
+              i + 1,                              // no (序号)
+              item.marks || null,                 // marks (唛头)
+              item.productName || null,           // product_name
+              item.productNameEn || null,         // product_name_en
+              item.spec || null,                  // spec (型号规格)
+              item.hsCode || null,                // hs_code
+              item.material || null,              // material (材质)
+              item.usage || null,                 // usage (用途)
+              item.brand || null,                 // brand (品牌)
+              item.origin || null,                // origin (原产国)
+              item.quantity || 0,                 // quantity
+              item.unit || 'PCS',                 // unit
+              item.unitPrice || 0,                // unit_price
+              item.totalPrice || 0,               // total_price
+              item.netWeight || 0,                // net_weight
+              item.grossWeight || 0,              // gross_weight
+              item.packages || 0,                 // packages (件数)
+              item.packingType || null,           // packing_type (包装方式)
+              item.volume || 0                    // volume (体积)
             )
           }
         }
+        console.log(`✅ 货物明细保存成功: ${cargoItems.length} 条`)
       } catch (cargoError) {
-        // cargo_items 表可能不存在，忽略错误
-        console.log('货物明细保存跳过（表可能不存在）:', cargoError.message)
+        console.error('❌ 货物明细保存失败:', cargoError.message)
       }
     }
     

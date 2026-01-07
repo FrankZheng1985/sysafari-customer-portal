@@ -16,31 +16,52 @@ import Settings from './pages/Settings'
 import UserManagement from './pages/UserManagement'
 import { portalApi } from './utils/api'
 
+// 缓存 Logo URL，避免重复请求
+let cachedLogoUrl: string | null = null
+let logoFetchPromise: Promise<string | null> | null = null
+
+export async function fetchSystemLogo(): Promise<string | null> {
+  // 如果已缓存，直接返回
+  if (cachedLogoUrl) return cachedLogoUrl
+  
+  // 如果正在请求中，返回同一个 Promise
+  if (logoFetchPromise) return logoFetchPromise
+  
+  logoFetchPromise = (async () => {
+    try {
+      const response = await portalApi.getSystemLogo()
+      if (response.data.errCode === 200 && response.data.data?.logoUrl) {
+        cachedLogoUrl = response.data.data.logoUrl
+        return cachedLogoUrl
+      }
+    } catch (error) {
+      console.error('获取 Logo 失败:', error)
+    }
+    return null
+  })()
+  
+  return logoFetchPromise
+}
+
 // 动态设置 Favicon 为公司 Logo
 function FaviconUpdater() {
   useEffect(() => {
     const updateFavicon = async () => {
-      try {
-        const response = await portalApi.getSystemLogo()
-        if (response.data.errCode === 200 && response.data.data?.logoUrl) {
-          const logoUrl = response.data.data.logoUrl
-          
-          // 查找现有的 favicon link 标签
-          let link = document.querySelector("link[rel*='icon']") as HTMLLinkElement
-          
-          if (!link) {
-            // 如果不存在，创建一个新的
-            link = document.createElement('link')
-            link.rel = 'icon'
-            document.head.appendChild(link)
-          }
-          
-          // 设置 favicon 为公司 Logo
-          link.type = 'image/png'
-          link.href = logoUrl
+      const logoUrl = await fetchSystemLogo()
+      if (logoUrl) {
+        // 查找现有的 favicon link 标签
+        let link = document.querySelector("link[rel*='icon']") as HTMLLinkElement
+        
+        if (!link) {
+          // 如果不存在，创建一个新的
+          link = document.createElement('link')
+          link.rel = 'icon'
+          document.head.appendChild(link)
         }
-      } catch (error) {
-        console.error('更新 Favicon 失败:', error)
+        
+        // 设置 favicon 为公司 Logo
+        link.type = 'image/png'
+        link.href = logoUrl
       }
     }
     
@@ -52,8 +73,9 @@ function FaviconUpdater() {
 
 // 受保护的路由组件
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
-  const { isAuthenticated, loading } = useAuth()
+  const { isAuthenticated, loading, token } = useAuth()
   
+  // 如果正在加载，或者有 token 但还未验证完成，显示加载状态
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
@@ -62,8 +84,18 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
     )
   }
   
-  if (!isAuthenticated) {
+  // 没有 token 或者认证失败，重定向到登录页
+  if (!isAuthenticated && !token) {
     return <Navigate to="/login" replace />
+  }
+  
+  // 有 token 但还没验证完成（user 还是 null），显示加载状态
+  if (token && !isAuthenticated) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
+      </div>
+    )
   }
   
   return <>{children}</>

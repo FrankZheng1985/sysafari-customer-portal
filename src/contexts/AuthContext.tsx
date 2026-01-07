@@ -34,21 +34,49 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<User | null>(null)
-  const [token, setToken] = useState<string | null>(localStorage.getItem('portal_token'))
-  const [loading, setLoading] = useState(true)
+  // 从 localStorage 初始化状态
+  const [user, setUser] = useState<User | null>(() => {
+    // 尝试从 localStorage 恢复用户信息
+    const savedUser = localStorage.getItem('portal_user')
+    if (savedUser) {
+      try {
+        return JSON.parse(savedUser)
+      } catch {
+        return null
+      }
+    }
+    return null
+  })
+  const [token, setToken] = useState<string | null>(() => localStorage.getItem('portal_token'))
+  const [loading, setLoading] = useState(() => {
+    // 如果有 token 但没有用户信息，则需要加载
+    const hasToken = !!localStorage.getItem('portal_token')
+    const hasUser = !!localStorage.getItem('portal_user')
+    return hasToken && !hasUser
+  })
 
-  // 初始化时检查 token 有效性
+  // 初始化时设置 Authorization header，只在需要时验证 token
   useEffect(() => {
     const initAuth = async () => {
+      // 如果已经有 token，设置 Authorization header
       if (token) {
+        api.defaults.headers.common['Authorization'] = `Bearer ${token}`
+      }
+      
+      // 如果已经有 user 数据，不需要验证
+      if (user) {
+        setLoading(false)
+        return
+      }
+      
+      // 如果有 token 但没有 user，需要验证
+      if (token && !user) {
         try {
-          api.defaults.headers.common['Authorization'] = `Bearer ${token}`
           const response = await api.get('/auth/me')
           if (response.data.errCode === 200) {
             const data = response.data.data
             // 转换字段名
-            setUser({
+            const userData: User = {
               id: data.id,
               customerId: data.customerId,
               customerName: data.companyName || data.customerName,
@@ -61,7 +89,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               roleId: data.roleId,
               roleName: data.roleName,
               permissions: data.permissions || []
-            })
+            }
+            // 保存到 localStorage
+            localStorage.setItem('portal_user', JSON.stringify(userData))
+            setUser(userData)
           } else {
             // Token 无效
             handleLogout()
@@ -74,10 +105,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
     
     initAuth()
-  }, [])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []) // 只在组件挂载时执行一次
 
   const handleLogout = () => {
     localStorage.removeItem('portal_token')
+    localStorage.removeItem('portal_user')
     delete api.defaults.headers.common['Authorization']
     setToken(null)
     setUser(null)
@@ -109,7 +142,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       permissions: customer.permissions || []
     }
     
+    // 保存到 localStorage（确保状态持久化）
     localStorage.setItem('portal_token', newToken)
+    localStorage.setItem('portal_user', JSON.stringify(userData))
     api.defaults.headers.common['Authorization'] = `Bearer ${newToken}`
     setToken(newToken)
     setUser(userData)

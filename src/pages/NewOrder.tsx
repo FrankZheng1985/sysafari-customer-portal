@@ -758,7 +758,7 @@ export default function NewOrder() {
                     onChange={handleChange}
                     className="w-4 h-4 text-primary-600 border-gray-300 focus:ring-primary-500"
                   />
-                  <span className="ml-2 text-sm text-gray-700">本地还柜 (Rotterdam)</span>
+                  <span className="ml-2 text-sm text-gray-700">本地还柜 (提柜码头还柜)</span>
                 </label>
               </div>
             </div>

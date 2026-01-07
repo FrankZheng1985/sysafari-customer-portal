@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react'
-import { useNavigate, useSearchParams } from 'react-router-dom'
+import { useSearchParams } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { Eye, EyeOff, AlertCircle } from 'lucide-react'
-import { portalApi } from '../utils/api'
+import { fetchSystemLogo } from '../App'
 
 export default function Login() {
   const [searchParams] = useSearchParams()
@@ -13,22 +13,26 @@ export default function Login() {
   const [error, setError] = useState('')
   const [logoUrl, setLogoUrl] = useState<string | null>(null)
   
-  const { login } = useAuth()
-  const navigate = useNavigate()
+  const { login, isAuthenticated, loading: authLoading } = useAuth()
 
-  // 获取系统 Logo
+  // 如果用户已登录（页面初始加载时检查），直接跳转到首页
+  // 使用 window.location 而不是 navigate，避免 React Router 状态问题
   useEffect(() => {
-    const fetchLogo = async () => {
-      try {
-        const response = await portalApi.getSystemLogo()
-        if (response.data.errCode === 200 && response.data.data?.logoUrl) {
-          setLogoUrl(response.data.data.logoUrl)
-        }
-      } catch (error) {
-        console.error('获取 Logo 失败:', error)
+    // 只在初始加载完成后检查，避免闪烁
+    if (!authLoading && isAuthenticated) {
+      window.location.href = '/'
+    }
+  }, [authLoading, isAuthenticated])
+
+  // 获取系统 Logo（使用共享缓存）
+  useEffect(() => {
+    const loadLogo = async () => {
+      const url = await fetchSystemLogo()
+      if (url) {
+        setLogoUrl(url)
       }
     }
-    fetchLogo()
+    loadLogo()
   }, [])
 
   // 从 URL 参数自动填充用户名
@@ -52,10 +56,11 @@ export default function Login() {
     
     try {
       await login(username, password)
-      navigate('/')
+      // 登录成功后，使用 window.location 强制完整页面导航
+      // 避免 React Router 的状态问题
+      window.location.href = '/'
     } catch (err: any) {
       setError(err.response?.data?.msg || err.message || '登录失败，请检查用户名和密码')
-    } finally {
       setLoading(false)
     }
   }

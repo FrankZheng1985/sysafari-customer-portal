@@ -92,17 +92,18 @@ const limiter = rateLimit({
     data: null
   },
   // 跳过健康检查等公共接口
+  // 注意：req.path 是相对于挂载点的，所以 /api/system/logo 的 req.path 是 /system/logo
   skip: (req) => {
-    const skipPaths = ['/api/health', '/api/system']
+    const skipPaths = ['/health', '/system']
     return skipPaths.some(path => req.path.startsWith(path))
   }
 })
 app.use('/api', limiter)
 
-// 登录接口速率限制（放宽到 20 次）
+// 登录接口速率限制（开发环境放宽到 100 次）
 const loginLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 分钟
-  max: 20, // 每个 IP 最多 20 次登录尝试（从5次放宽到20次）
+  max: 100, // 每个 IP 最多 100 次登录尝试（开发环境放宽限制）
   message: {
     errCode: 429,
     msg: '登录尝试过多，请 15 分钟后再试',
