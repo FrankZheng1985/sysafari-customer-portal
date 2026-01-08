@@ -42,10 +42,14 @@ export default function Login() {
     const tokenParam = searchParams.get('token')
     
     // 如果有 token 参数且还没尝试过登录
-    if (tokenParam && !tokenLoginAttempted.current && !isAuthenticated && !authLoading) {
+    if (tokenParam && !tokenLoginAttempted.current && !authLoading) {
       tokenLoginAttempted.current = true
       setProxyLoginLoading(true)
       setError('')
+      
+      // 先清除旧的登录状态，确保使用新 token 的客户信息
+      localStorage.removeItem('portal_token')
+      localStorage.removeItem('portal_user')
       
       // 使用 token 直接登录
       loginWithToken(tokenParam)
@@ -58,7 +62,7 @@ export default function Login() {
           setProxyLoginLoading(false)
         })
     }
-  }, [searchParams, loginWithToken, isAuthenticated, authLoading])
+  }, [searchParams, loginWithToken, authLoading])
 
   // 从 URL 参数自动填充用户名
   useEffect(() => {
