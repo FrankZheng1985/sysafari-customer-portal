@@ -957,17 +957,21 @@ export default function Quote() {
                                   )}
                                 </div>
                                 <p className="text-xs text-gray-500">{truck.nameEn}</p>
-                                <div className="flex items-center gap-2 mt-1.5">
-                                  <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs bg-gray-100 text-gray-600">
-                                    {truck.maxWeight / 1000}t
-                                  </span>
-                                  {truck.maxVolume && (
+                                {/* 显示描述信息 - 特种车辆显示详细描述，其他显示载重和体积 */}
+                                {truck.description ? (
+                                  <p className="text-xs text-gray-500 mt-1.5">{truck.description}</p>
+                                ) : (
+                                  <div className="flex items-center gap-2 mt-1.5">
                                     <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs bg-gray-100 text-gray-600">
-                                      {truck.maxVolume}m³
+                                      {truck.maxWeight / 1000}t
                                     </span>
-                                  )}
-                                </div>
-                                {/* 价格信息已隐藏，实际报价由供应商系统提供 */}
+                                    {truck.maxVolume && truck.maxVolume > 0 && (
+                                      <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs bg-gray-100 text-gray-600">
+                                        {truck.maxVolume}m³
+                                      </span>
+                                    )}
+                                  </div>
+                                )}
                               </div>
                             </label>
                           ))}
