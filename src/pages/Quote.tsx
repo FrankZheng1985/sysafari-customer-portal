@@ -25,6 +25,45 @@ interface TruckType {
   minCharge: number
 }
 
+// 卡车类型分类配置
+const TRUCK_CATEGORIES = [
+  { 
+    key: 'van', 
+    name: '厢式货车', 
+    nameEn: 'Van', 
+    icon: '🚐',
+    description: '城市配送、短途运输'
+  },
+  { 
+    key: 'rigid', 
+    name: '箱式卡车', 
+    nameEn: 'Rigid Truck', 
+    icon: '🚛',
+    description: '中长途标准货物'
+  },
+  { 
+    key: 'semi', 
+    name: '半挂车', 
+    nameEn: 'Semi-Trailer', 
+    icon: '🚚',
+    description: '长途大批量运输'
+  },
+  { 
+    key: 'reefer', 
+    name: '冷藏车', 
+    nameEn: 'Reefer', 
+    icon: '❄️',
+    description: '温控货物运输'
+  },
+  { 
+    key: 'special', 
+    name: '特种车辆', 
+    nameEn: 'Special', 
+    icon: '⚠️',
+    description: '特殊货物运输'
+  }
+] as const
+
 interface CargoItem {
   id: string
   name: string
@@ -176,7 +215,9 @@ export default function Quote() {
       if (res.data.errCode === 200) {
         setTruckTypes(res.data.data || [])
         // 默认选择标准半挂车
-        const defaultTruck = res.data.data?.find((t: TruckType) => t.code === 'SEMI_40')
+        const defaultTruck = res.data.data?.find((t: TruckType) => 
+          t.code === 'SEMI_STANDARD' || t.code === 'SEMI_40'
+        )
         if (defaultTruck) {
           setSelectedTruck(defaultTruck.code)
         }
@@ -883,41 +924,80 @@ export default function Quote() {
                   卡车类型
                 </h3>
                 
-                <div className="grid grid-cols-2 gap-3">
-                  {truckTypes.map((truck) => (
-                    <label
-                      key={truck.code}
-                      className={`relative flex items-start p-3 border rounded-lg cursor-pointer hover:bg-gray-50 ${
-                        selectedTruck === truck.code
-                          ? 'border-primary-500 bg-primary-50'
-                          : 'border-gray-200'
-                      }`}
-                    >
-                      <input
-                        type="radio"
-                        name="truckType"
-                        value={truck.code}
-                        checked={selectedTruck === truck.code}
-                        onChange={(e) => setSelectedTruck(e.target.value)}
-                        className="sr-only"
-                      />
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium text-gray-900">{truck.name}</p>
-                        <p className="text-xs text-gray-500">{truck.nameEn}</p>
-                        <p className="text-xs text-gray-500 mt-1">
-                          载重: {truck.maxWeight / 1000}t
-                          {truck.maxVolume && ` | 容积: ${truck.maxVolume}m³`}
-                        </p>
-                        <p className="text-xs text-primary-600 mt-1">
-                          €{truck.baseRatePerKm}/km
-                        </p>
+                {/* 按分类显示卡车类型 */}
+                <div className="space-y-6">
+                  {TRUCK_CATEGORIES.map((category) => {
+                    // 获取该分类下的卡车
+                    const categoryTrucks = truckTypes.filter(t => t.category === category.key)
+                    
+                    // 如果该分类没有卡车，不显示
+                    if (categoryTrucks.length === 0) return null
+                    
+                    return (
+                      <div key={category.key} className="space-y-3">
+                        {/* 分类标题 */}
+                        <div className="flex items-center gap-2 pb-2 border-b border-gray-100">
+                          <span className="text-lg">{category.icon}</span>
+                          <div>
+                            <h4 className="text-sm font-semibold text-gray-800">{category.name}</h4>
+                            <p className="text-xs text-gray-500">{category.nameEn} · {category.description}</p>
+                          </div>
+                        </div>
+                        
+                        {/* 该分类下的卡车选项 */}
+                        <div className="grid grid-cols-2 gap-3">
+                          {categoryTrucks.map((truck) => (
+                            <label
+                              key={truck.code}
+                              className={`relative flex items-start p-3 border rounded-lg cursor-pointer transition-all hover:shadow-sm ${
+                                selectedTruck === truck.code
+                                  ? 'border-primary-500 bg-primary-50 shadow-sm'
+                                  : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
+                              }`}
+                            >
+                              <input
+                                type="radio"
+                                name="truckType"
+                                value={truck.code}
+                                checked={selectedTruck === truck.code}
+                                onChange={(e) => setSelectedTruck(e.target.value)}
+                                className="sr-only"
+                              />
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center justify-between">
+                                  <p className="text-sm font-medium text-gray-900">{truck.name}</p>
+                                  {selectedTruck === truck.code && (
+                                    <Check className="w-4 h-4 text-primary-500 flex-shrink-0" />
+                                  )}
+                                </div>
+                                <p className="text-xs text-gray-500">{truck.nameEn}</p>
+                                <div className="flex items-center gap-2 mt-1.5">
+                                  <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs bg-gray-100 text-gray-600">
+                                    {truck.maxWeight / 1000}t
+                                  </span>
+                                  {truck.maxVolume && (
+                                    <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs bg-gray-100 text-gray-600">
+                                      {truck.maxVolume}m³
+                                    </span>
+                                  )}
+                                </div>
+                                {/* 价格信息已隐藏，实际报价由供应商系统提供 */}
+                              </div>
+                            </label>
+                          ))}
+                        </div>
                       </div>
-                      {selectedTruck === truck.code && (
-                        <Check className="w-5 h-5 text-primary-500" />
-                      )}
-                    </label>
-                  ))}
+                    )
+                  })}
                 </div>
+                
+                {/* 如果没有卡车类型数据 */}
+                {truckTypes.length === 0 && (
+                  <div className="text-center py-8 text-gray-500">
+                    <Truck className="w-10 h-10 mx-auto text-gray-300" />
+                    <p className="mt-2">正在加载卡车类型...</p>
+                  </div>
+                )}
               </div>
             )}
 
