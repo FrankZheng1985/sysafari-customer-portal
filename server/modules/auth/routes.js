@@ -356,19 +356,69 @@ router.get('/me', authenticate, async (req, res) => {
     
     let userData
     
-    // 工作人员代登录：直接从 Token 返回信息，不查询数据库
+    // 工作人员代登录：从 portal_customers 表查询客户信息
     if (staffProxy) {
-      console.log('📝 工作人员代登录验证成功:', { staffName, customerId, username })
+      console.log('📝 工作人员代登录验证成功:', { staffName, customerId, username, customerName })
+      
+      // 尝试从 portal_customers 表获取正确的 customer_code
+      let customerCode = req.customer.customerCode || customerId
+      let companyName = customerName || ''
+      let email = req.customer.email || ''
+      let phone = req.customer.phone || ''
+      
+      try {
+        // 方案1: 根据 customer_id 查询 portal_customers 表
+        let portalCustomer = await db.prepare(`
+          SELECT customer_code, company_name, email, phone, contact_name
+          FROM portal_customers 
+          WHERE customer_id = $1
+        `).get(customerId)
+        
+        // 方案2: 如果 customer_id 没找到，尝试用公司名模糊匹配
+        if (!portalCustomer && customerName) {
+          console.log('📝 尝试用公司名匹配:', customerName)
+          portalCustomer = await db.prepare(`
+            SELECT customer_code, company_name, email, phone, contact_name
+            FROM portal_customers 
+            WHERE company_name LIKE $1 OR contact_name LIKE $1
+            LIMIT 1
+          `).get(`%${customerName}%`)
+        }
+        
+        // 方案3: 如果还没找到，尝试用用户名/邮箱匹配
+        if (!portalCustomer && username) {
+          console.log('📝 尝试用用户名匹配:', username)
+          portalCustomer = await db.prepare(`
+            SELECT customer_code, company_name, email, phone, contact_name
+            FROM portal_customers 
+            WHERE email = $1 OR contact_name = $1
+            LIMIT 1
+          `).get(username)
+        }
+        
+        if (portalCustomer) {
+          customerCode = portalCustomer.customer_code || customerCode
+          companyName = portalCustomer.company_name || companyName
+          email = portalCustomer.email || email
+          phone = portalCustomer.phone || phone
+          console.log('✅ 从 portal_customers 获取到客户编码:', customerCode)
+        } else {
+          console.log('⚠️ portal_customers 中未找到匹配的客户记录')
+        }
+      } catch (err) {
+        console.log('⚠️ 查询 portal_customers 失败:', err.message)
+      }
+      
       userData = {
         id: accountId,
         customerId: customerId,
-        customerCode: req.customer.customerCode || customerId,
+        customerCode: customerCode,
         username: username,
         displayName: customerName || username,
-        email: req.customer.email || '',
-        companyName: customerName || '',
+        email: email,
+        companyName: companyName,
         contactPerson: customerName || username,
-        phone: req.customer.phone || '',
+        phone: phone,
         status: 'active',
         userType: 'master',
         roleId: null,

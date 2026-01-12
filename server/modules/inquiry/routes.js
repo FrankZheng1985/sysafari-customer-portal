@@ -512,15 +512,28 @@ router.get('/truck-types', authenticate, async (req, res) => {
     res.json({ errCode: 200, msg: 'success', data: result })
   } catch (error) {
     console.error('获取卡车类型失败:', error.message)
-    // 返回默认卡车类型
+    // 返回默认卡车类型 - 与ERP系统保持一致
     res.json({
       errCode: 200,
       msg: 'success',
       data: [
-        { id: 1, code: 'VAN', name: '小型货车', nameEn: 'Van', category: 'small', maxWeight: 1500, maxVolume: 10, baseRatePerKm: 1.2, minCharge: 80 },
-        { id: 2, code: 'TRUCK_7T', name: '7.5吨卡车', nameEn: '7.5T Truck', category: 'medium', maxWeight: 7500, maxVolume: 35, baseRatePerKm: 1.5, minCharge: 150 },
-        { id: 3, code: 'TRUCK_18T', name: '18吨卡车', nameEn: '18T Truck', category: 'large', maxWeight: 18000, maxVolume: 60, baseRatePerKm: 2.0, minCharge: 250 },
-        { id: 4, code: 'TRUCK_40T', name: '40吨半挂', nameEn: '40T Semi', category: 'xlarge', maxWeight: 40000, maxVolume: 90, baseRatePerKm: 2.8, minCharge: 400 }
+        // 厢式配送车 (Distribution Vehicles)
+        { id: 1, code: 'sprinter', name: 'Sprinter', nameEn: 'Mercedes Sprinter (3.5t)', category: 'distribution', description: '载重: 1.2t | 容积: 14m³', maxWeight: 1200, maxVolume: 14, baseRatePerKm: 1.0, minCharge: 80 },
+        { id: 2, code: 'small_van', name: '小型厢式车', nameEn: 'Small Van (7.5t)', category: 'distribution', description: '载重: 3t | 容积: 20m³', maxWeight: 3000, maxVolume: 20, baseRatePerKm: 1.2, minCharge: 100 },
+        { id: 3, code: 'medium_van', name: '中型厢式车', nameEn: 'Medium Van (12t)', category: 'distribution', description: '载重: 6t | 容积: 40m³', maxWeight: 6000, maxVolume: 40, baseRatePerKm: 1.5, minCharge: 150 },
+        { id: 4, code: 'large_van', name: '大型厢式车', nameEn: 'Large Van (18t)', category: 'distribution', description: '载重: 10t | 容积: 55m³', maxWeight: 10000, maxVolume: 55, baseRatePerKm: 1.8, minCharge: 200 },
+        // 半挂车/公路运输 (Semi-trailers)
+        { id: 5, code: 'curtainsider', name: '篷布半挂车', nameEn: 'Curtainsider (Tautliner)', category: 'semi_trailer', description: '载重: 24t | 容积: 86m³', maxWeight: 24000, maxVolume: 86, baseRatePerKm: 2.0, minCharge: 300 },
+        { id: 6, code: 'semi_40', name: '40尺标准半挂', nameEn: 'Standard Semi (40ft)', category: 'semi_trailer', description: '载重: 25t | 容积: 76m³', maxWeight: 25000, maxVolume: 76, baseRatePerKm: 2.2, minCharge: 320 },
+        { id: 7, code: 'mega_trailer', name: 'Mega半挂车', nameEn: 'Mega Trailer (45ft)', category: 'semi_trailer', description: '载重: 24t | 容积: 100m³', maxWeight: 24000, maxVolume: 100, baseRatePerKm: 2.4, minCharge: 350 },
+        { id: 8, code: 'double_deck', name: '双层半挂车', nameEn: 'Double Deck Trailer', category: 'semi_trailer', description: '载重: 22t | 容积: 120m³', maxWeight: 22000, maxVolume: 120, baseRatePerKm: 2.5, minCharge: 380 },
+        // 特种车辆 (Special Vehicles)
+        { id: 9, code: 'reefer_small', name: '冷藏车(小)', nameEn: 'Reefer Van (7.5t)', category: 'special', description: '载重: 2.5t | 温控: -25°C~+25°C', maxWeight: 2500, maxVolume: 20, baseRatePerKm: 1.8, minCharge: 150 },
+        { id: 10, code: 'reefer_large', name: '冷藏半挂', nameEn: 'Reefer Semi-trailer', category: 'special', description: '载重: 22t | 温控: -25°C~+25°C', maxWeight: 22000, maxVolume: 80, baseRatePerKm: 2.8, minCharge: 400 },
+        { id: 11, code: 'flatbed', name: '平板车', nameEn: 'Flatbed Trailer', category: 'special', description: '载重: 28t | 长度: 13.6m', maxWeight: 28000, maxVolume: 0, baseRatePerKm: 2.3, minCharge: 350 },
+        { id: 12, code: 'lowloader', name: '低板车', nameEn: 'Low Loader', category: 'special', description: '载重: 40t | 适合超高货物', maxWeight: 40000, maxVolume: 0, baseRatePerKm: 3.5, minCharge: 500 },
+        { id: 13, code: 'hazmat', name: 'ADR危险品车', nameEn: 'ADR Hazmat Truck', category: 'special', description: '载重: 22t | ADR认证', maxWeight: 22000, maxVolume: 75, baseRatePerKm: 3.0, minCharge: 450 },
+        { id: 14, code: 'tanker', name: '罐车', nameEn: 'Tanker Truck', category: 'special', description: '容量: 30,000L | 液体运输', maxWeight: 25000, maxVolume: 30, baseRatePerKm: 3.2, minCharge: 480 }
       ]
     })
   }

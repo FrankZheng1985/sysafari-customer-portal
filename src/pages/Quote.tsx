@@ -25,42 +25,28 @@ interface TruckType {
   minCharge: number
 }
 
-// 卡车类型分类配置
+// 卡车类型分类配置 - 与ERP系统保持一致
 const TRUCK_CATEGORIES = [
   { 
-    key: 'van', 
-    name: '厢式货车', 
-    nameEn: 'Van', 
+    key: 'distribution', 
+    name: '厢式配送车', 
+    nameEn: 'Distribution Vehicles', 
     icon: '🚐',
-    description: '城市配送、短途运输'
+    description: '适合城市配送和区域运输'
   },
   { 
-    key: 'rigid', 
-    name: '箱式卡车', 
-    nameEn: 'Rigid Truck', 
-    icon: '🚛',
-    description: '中长途标准货物'
-  },
-  { 
-    key: 'semi', 
-    name: '半挂车', 
-    nameEn: 'Semi-Trailer', 
+    key: 'semi_trailer', 
+    name: '半挂车/公路运输', 
+    nameEn: 'Semi-trailers', 
     icon: '🚚',
-    description: '长途大批量运输'
-  },
-  { 
-    key: 'reefer', 
-    name: '冷藏车', 
-    nameEn: 'Reefer', 
-    icon: '❄️',
-    description: '温控货物运输'
+    description: '适合长途干线运输'
   },
   { 
     key: 'special', 
     name: '特种车辆', 
-    nameEn: 'Special', 
+    nameEn: 'Special Vehicles', 
     icon: '⚠️',
-    description: '特殊货物运输'
+    description: '特殊货物运输需求'
   }
 ] as const
 
