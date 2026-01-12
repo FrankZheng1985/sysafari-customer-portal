@@ -188,8 +188,32 @@ async function handleSubUserLogin(db, subUser, password, req, res) {
   // 获取用户权限
   const permissions = await getUserPermissions(subUser.role_id)
   
-  const customerCode = subUser.customer_code || subUser.customer_id
-  const companyName = subUser.company_name || subUser.customer_name || ''
+  // 获取 customerCode，优先从 customers 表，否则从 portal_customers 表
+  let customerCode = subUser.customer_code
+  let companyName = subUser.company_name || subUser.customer_name || ''
+  
+  // 如果 customers 表中没有 customer_code，尝试从 portal_customers 表获取
+  if (!customerCode) {
+    try {
+      // 尝试用 customer_id 查询 portal_customers
+      let portalCustomer = await db.prepare(`
+        SELECT customer_code, company_name
+        FROM portal_customers 
+        WHERE customer_id = $1
+      `).get(subUser.customer_id)
+      
+      if (portalCustomer) {
+        customerCode = portalCustomer.customer_code
+        companyName = portalCustomer.company_name || companyName
+        console.log('✅ 子账户登录时从 portal_customers 获取到 customer_code:', customerCode)
+      }
+    } catch (err) {
+      console.log('⚠️ 子账户登录时查询 portal_customers 失败:', err.message)
+    }
+  }
+  
+  // 最终回退到 customer_id
+  customerCode = customerCode || subUser.customer_id
   
   // 生成 Token（子账户）
   const token = generateToken({
@@ -300,9 +324,51 @@ async function handleMasterAccountLogin(db, account, password, req, res) {
     WHERE id = $2
   `).run(req.ip || req.connection?.remoteAddress || null, account.id)
   
-  const customerCode = account.customer_code || account.customer_id
-  const companyName = account.company_name || account.customer_name || ''
+  // 获取 customerCode，优先从 customers 表，否则从 portal_customers 表
+  let customerCode = account.customer_code
+  let companyName = account.company_name || account.customer_name || ''
   const contactName = account.contact_person || account.username
+  
+  // 如果 customers 表中没有 customer_code，尝试从 portal_customers 表获取
+  if (!customerCode) {
+    try {
+      // 尝试用 customer_id 查询 portal_customers
+      let portalCustomer = await db.prepare(`
+        SELECT customer_code, company_name
+        FROM portal_customers 
+        WHERE customer_id::text = $1
+      `).get(String(account.customer_id))
+      
+      // 如果没找到，用邮箱匹配
+      if (!portalCustomer && account.email) {
+        portalCustomer = await db.prepare(`
+          SELECT customer_code, company_name
+          FROM portal_customers 
+          WHERE email = $1
+        `).get(account.email)
+      }
+      
+      // 如果没找到，用用户名匹配
+      if (!portalCustomer && account.username) {
+        portalCustomer = await db.prepare(`
+          SELECT customer_code, company_name
+          FROM portal_customers 
+          WHERE email = $1 OR contact_name = $1
+        `).get(account.username)
+      }
+      
+      if (portalCustomer) {
+        customerCode = portalCustomer.customer_code
+        companyName = portalCustomer.company_name || companyName
+        console.log('✅ 登录时从 portal_customers 获取到 customer_code:', customerCode)
+      }
+    } catch (err) {
+      console.log('⚠️ 登录时查询 portal_customers 失败:', err.message)
+    }
+  }
+  
+  // 最终回退到 customer_id
+  customerCode = customerCode || account.customer_id
   
   // 生成 Token（主账户拥有所有权限）
   const token = generateToken({
@@ -511,14 +577,55 @@ router.get('/me', authenticate, async (req, res) => {
         })
       }
       
+      // 如果 customers 表中没有 customer_code，尝试从 portal_customers 表获取
+      let customerCode = account.customer_code
+      let companyName = account.company_name || account.customer_name || ''
+      
+      if (!customerCode) {
+        try {
+          // 尝试用 customer_id 查询 portal_customers
+          let portalCustomer = await db.prepare(`
+            SELECT customer_code, company_name
+            FROM portal_customers 
+            WHERE customer_id::text = $1
+          `).get(String(account.customer_id))
+          
+          // 如果没找到，用邮箱匹配
+          if (!portalCustomer && account.email) {
+            portalCustomer = await db.prepare(`
+              SELECT customer_code, company_name
+              FROM portal_customers 
+              WHERE email = $1
+            `).get(account.email)
+          }
+          
+          // 如果没找到，用用户名匹配
+          if (!portalCustomer && account.username) {
+            portalCustomer = await db.prepare(`
+              SELECT customer_code, company_name
+              FROM portal_customers 
+              WHERE email = $1 OR contact_name = $1
+            `).get(account.username)
+          }
+          
+          if (portalCustomer) {
+            customerCode = portalCustomer.customer_code
+            companyName = portalCustomer.company_name || companyName
+            console.log('✅ 从 portal_customers 补充获取到 customer_code:', customerCode)
+          }
+        } catch (err) {
+          console.log('⚠️ 查询 portal_customers 失败:', err.message)
+        }
+      }
+      
       userData = {
         id: account.id,
         customerId: account.customer_id,
-        customerCode: account.customer_code || account.customer_id,
+        customerCode: customerCode || account.customer_id,
         username: account.username,
         displayName: account.contact_person || account.username,
         email: account.email,
-        companyName: account.company_name || account.customer_name || '',
+        companyName: companyName,
         contactPerson: account.contact_person || account.username,
         phone: account.phone,
         status: account.status,
