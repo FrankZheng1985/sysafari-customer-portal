@@ -352,9 +352,39 @@ async function handleMasterAccountLogin(db, account, password, req, res) {
 router.get('/me', authenticate, async (req, res) => {
   try {
     const db = getDatabase()
-    const { userType, userId, accountId, customerId } = req.customer
+    const { userType, userId, accountId, customerId, staffProxy, customerName, username, staffName } = req.customer
     
     let userData
+    
+    // 工作人员代登录：直接从 Token 返回信息，不查询数据库
+    if (staffProxy) {
+      console.log('📝 工作人员代登录验证成功:', { staffName, customerId, username })
+      userData = {
+        id: accountId,
+        customerId: customerId,
+        customerCode: req.customer.customerCode || customerId,
+        username: username,
+        displayName: customerName || username,
+        email: req.customer.email || '',
+        companyName: customerName || '',
+        contactPerson: customerName || username,
+        phone: req.customer.phone || '',
+        status: 'active',
+        userType: 'master',
+        roleId: null,
+        roleName: '管理员',
+        permissions: [],
+        // 代登录标记
+        staffProxy: true,
+        staffName: staffName
+      }
+      
+      return res.json({
+        errCode: 200,
+        msg: 'success',
+        data: userData
+      })
+    }
     
     if (userType === 'sub') {
       // 子账户

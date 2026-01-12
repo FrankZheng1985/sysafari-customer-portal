@@ -8,7 +8,8 @@ import jwt from 'jsonwebtoken'
 import { getDatabase } from '../config/database.js'
 
 // JWT 配置
-const JWT_SECRET = process.env.JWT_SECRET || 'portal-secret-key-change-in-production'
+// 注意：此密钥必须与 ERP 系统的 JWT_SECRET 保持一致，以支持工作人员代登录功能
+const JWT_SECRET = process.env.JWT_SECRET || 'customer-portal-secret-key'
 const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '7d'
 
 /**
@@ -65,22 +66,32 @@ export function authenticate(req, res, next) {
   }
 
   // 从 Token 获取客户信息
+  // 支持 ERP 系统代登录 Token（使用 type: 'customer'）和客户门户 Token（使用 userType）
+  const isStaffProxy = decoded.staffProxy === true
+  const userType = decoded.userType || (decoded.type === 'customer' ? 'master' : 'master')
+  
   req.customer = {
     accountId: decoded.accountId,
     customerId: decoded.customerId,
-    customerCode: decoded.customerCode,
+    customerCode: decoded.customerCode || decoded.customerId,
+    customerName: decoded.customerName,
     username: decoded.username,
     email: decoded.email,
-    companyName: decoded.companyName,
+    companyName: decoded.companyName || decoded.customerName,
     contactPerson: decoded.contactPerson || decoded.username,
     phone: decoded.phone,
     status: 'active',
-    // 新增：用户类型和权限信息
-    userType: decoded.userType || 'master',  // master = 主账户, sub = 子账户
-    userId: decoded.userId || decoded.accountId,  // 子账户的 portal_users.id
+    // 用户类型和权限信息
+    userType: userType,
+    userId: decoded.userId || decoded.accountId,
     roleId: decoded.roleId || null,
     roleName: decoded.roleName || null,
-    permissions: decoded.permissions || []  // 权限代码数组
+    permissions: decoded.permissions || [],
+    // 工作人员代登录标记
+    staffProxy: isStaffProxy,
+    staffId: decoded.staffId,
+    staffName: decoded.staffName,
+    staffRole: decoded.staffRole
   }
   
   next()
