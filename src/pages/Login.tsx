@@ -20,11 +20,17 @@ export default function Login() {
   // 如果用户已登录（页面初始加载时检查），直接跳转到首页
   // 使用 window.location 而不是 navigate，避免 React Router 状态问题
   useEffect(() => {
+    // 如果 URL 中有 token 参数，说明是代登录，不要自动跳转（让代登录逻辑处理）
+    const tokenParam = searchParams.get('token')
+    if (tokenParam) {
+      return // 有 token 参数时，不自动跳转，等待代登录处理
+    }
+    
     // 只在初始加载完成后检查，避免闪烁
     if (!authLoading && isAuthenticated && !proxyLoginLoading) {
       window.location.href = '/'
     }
-  }, [authLoading, isAuthenticated, proxyLoginLoading])
+  }, [authLoading, isAuthenticated, proxyLoginLoading, searchParams])
 
   // 获取系统 Logo（使用共享缓存）
   useEffect(() => {
